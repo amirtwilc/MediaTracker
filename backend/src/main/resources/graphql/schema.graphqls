@@ -1,0 +1,70 @@
+type Query {
+  searchMediaItems(query: String!, category: Category, page: Int = 0, size: Int = 20): [MediaItemResponse]
+  myMediaList(page: Int = 0, size: Int = 20): [UserMediaListResponse]
+  myFollowers: [UserResponse]
+  myFollowing: [UserFollowResponse]
+}
+
+type Mutation {
+  addMediaToList(mediaItemId: ID!): UserMediaListResponse
+  updateMediaListItem(id: ID!, request: UpdateMediaListRequest!): UserMediaListResponse
+  removeMediaFromList(id: ID!): Boolean
+
+  followUser(request: FollowRequest!): UserFollowResponse
+  unfollowUser(followUserId: ID!): Boolean
+  updateFollowThreshold(followUserId: ID!, threshold: Int!): UserFollowResponse
+}
+
+enum Category {
+  MOVIE
+  SERIES
+  GAME
+}
+
+# Your existing DTOs become GraphQL object types
+type MediaItemResponse {
+  id: ID!
+  name: String
+  category: Category
+  genres: [GenreResponse]
+  platforms: [PlatformResponse]
+}
+
+type GenreResponse {
+  id: ID!
+  name: String
+}
+
+type PlatformResponse {
+  id: ID!
+  name: String
+}
+
+type UserMediaListResponse {
+  id: ID!
+  mediaItem: MediaItemResponse
+  experienced: Boolean
+  wishToReexperience: Boolean
+  rating: Int
+}
+
+type UserResponse {
+  id: ID!
+  username: String
+}
+
+type UserFollowResponse {
+  user: UserResponse
+  minimumRatingThreshold: Int
+}
+
+input UpdateMediaListRequest {
+  experienced: Boolean
+  wishToReexperience: Boolean
+  rating: Int
+}
+
+input FollowRequest {
+  userId: ID!
+  minimumRatingThreshold: Int = 7
+}
