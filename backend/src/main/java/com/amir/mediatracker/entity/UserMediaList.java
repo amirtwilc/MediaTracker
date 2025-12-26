@@ -34,6 +34,9 @@ public class UserMediaList {
     private Boolean wishToReexperience = false;
     private Short rating;
 
+    @Column(name = "comment", length = 100)
+    private String comment;
+
     @CreatedDate
     private LocalDateTime addedAt;
 

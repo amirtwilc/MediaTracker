@@ -52,6 +52,7 @@ public class MediaItemService {
                 .id(item.getId())
                 .category(item.getCategory())
                 .name(item.getName())
+                .year(item.getYear())
                 .genres(item.getGenres().stream()
                         .map(g -> GenreResponse.builder()
                                 .id(g.getId())

@@ -20,6 +20,8 @@ public class MediaItemRequest {
     @Size(max = 255)
     private String name;
 
+    private Integer year;
+
     @NotEmpty(message = "At least one genre is required")
     private Set<Long> genreIds;
 

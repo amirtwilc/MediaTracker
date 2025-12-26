@@ -34,6 +34,7 @@ public class MediaItemWriter implements ItemWriter<MediaItem> {
                 MediaItem existing = existingItem.get();
                 existing.setGenres(item.getGenres());
                 existing.setPlatforms(item.getPlatforms());
+                existing.setYear(item.getYear());
                 existing.setUpdatedAt(LocalDateTime.now());
                 item = mediaItemRepository.save(existing);
                 log.info("MediaItemWriter::write() item updated: {}", item);

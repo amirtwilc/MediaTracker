@@ -43,6 +43,15 @@ public class MediaItemProcessor implements ItemProcessor<MediaItemCSV, MediaItem
             item.setCategory(Category.valueOf(csvItem.getCategory()));
             item.setName(csvItem.getName().trim());
 
+            if (csvItem.getYear() != null && !csvItem.getYear().trim().isEmpty()) {
+                try {
+                    item.setYear(Integer.parseInt(csvItem.getYear().trim()));
+                } catch (NumberFormatException e) {
+                    log.warn("Invalid year format for item {}: {}", csvItem.getName(), csvItem.getYear());
+                    // Year remains null if invalid
+                }
+            }
+
             // Process genres (comma-separated)
             Set<Genre> genres = new HashSet<>();
             String[] genreNames = csvItem.getGenres().split(",");

@@ -31,6 +31,9 @@ public class MediaItem {
     @Column(nullable = false)
     private String name;
 
+    @Column(name = "year")
+    private Integer year;
+
     @ManyToMany(fetch = FetchType.EAGER, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
     @JoinTable(
             name = "media_item_genres",

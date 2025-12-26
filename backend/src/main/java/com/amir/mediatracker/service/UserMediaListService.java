@@ -93,6 +93,10 @@ public class UserMediaListService {
             listItem.setWishToReexperience(request.getWishToReexperience());
         }
 
+        if (request.getComment() != null) {
+            listItem.setComment(request.getComment());
+        }
+
         // If rating is being set/updated, use RatingService to trigger Kafka event
         if (request.getRating() != null) {
             listItem.setRating(request.getRating());
@@ -120,6 +124,7 @@ public class UserMediaListService {
                 .experienced(item.getExperienced())
                 .wishToReexperience(item.getWishToReexperience())
                 .rating(item.getRating())
+                .comment(item.getComment())
                 .addedAt(item.getAddedAt())
                 .updatedAt(item.getUpdatedAt())
                 .build();
@@ -130,6 +135,7 @@ public class UserMediaListService {
                 .id(item.getId())
                 .category(item.getCategory())
                 .name(item.getName())
+                .year(item.getYear())
                 .genres(item.getGenres().stream()
                         .map(g -> GenreResponse.builder()
                                 .id(g.getId())

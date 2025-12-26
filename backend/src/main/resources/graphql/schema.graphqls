@@ -26,6 +26,7 @@ type MediaItemResponse {
   id: ID!
   name: String
   category: Category
+  year: Int
   genres: [GenreResponse]
   platforms: [PlatformResponse]
 }
@@ -46,6 +47,7 @@ type UserMediaListResponse {
   experienced: Boolean
   wishToReexperience: Boolean
   rating: Int
+  comment: String
 }
 
 type UserResponse {
@@ -62,6 +64,7 @@ input UpdateMediaListRequest {
   experienced: Boolean
   wishToReexperience: Boolean
   rating: Int
+  comment: String
 }
 
 input FollowRequest {

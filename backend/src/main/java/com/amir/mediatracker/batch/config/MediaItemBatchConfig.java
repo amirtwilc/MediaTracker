@@ -72,7 +72,7 @@ public class MediaItemBatchConfig {
                 .name("mediaItemCSVReader")
                 .resource(new FileSystemResource(filePath))
                 .delimited()
-                .names("category", "name", "genres", "platforms")
+                .names("category", "name", "year", "genres", "platforms")
                 .linesToSkip(1)
                 .fieldSetMapper(new BeanWrapperFieldSetMapper<>() {{
                     setTargetType(MediaItemCSV.class);

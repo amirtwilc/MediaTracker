@@ -98,6 +98,7 @@ public class AdminService {
         MediaItem item = new MediaItem();
         item.setCategory(request.getCategory());
         item.setName(request.getName());
+        item.setYear(request.getYear());
 
         // Fetch and set genres
         Set<Genre> genres = new HashSet<>();
@@ -128,6 +129,7 @@ public class AdminService {
 
         item.setCategory(request.getCategory());
         item.setName(request.getName());
+        item.setYear(request.getYear());
 
         // Update genres
         Set<Genre> genres = new HashSet<>();
@@ -202,6 +204,7 @@ public class AdminService {
                 .id(item.getId())
                 .category(item.getCategory())
                 .name(item.getName())
+                .year(item.getYear())
                 .genres(item.getGenres().stream()
                         .map(this::mapGenreToResponse)
                         .collect(Collectors.toSet()))

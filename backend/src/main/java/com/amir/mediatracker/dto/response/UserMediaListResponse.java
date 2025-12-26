@@ -14,6 +14,7 @@ public class UserMediaListResponse {
     private Boolean experienced;
     private Boolean wishToReexperience;
     private Short rating;
+    private String comment;
     private LocalDateTime addedAt;
     private LocalDateTime updatedAt;
 }

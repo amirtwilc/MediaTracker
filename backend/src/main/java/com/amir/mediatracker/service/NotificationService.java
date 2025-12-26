@@ -116,6 +116,7 @@ public class NotificationService {
                 .id(item.getId())
                 .category(item.getCategory())
                 .name(item.getName())
+                .year(item.getYear())
                 .genres(mapGenreSetToResponse(item.getGenres()))
                 .platforms(mapPlatformSetToResponse(item.getPlatforms()))
                 .build();
