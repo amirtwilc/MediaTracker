@@ -136,6 +136,7 @@ public class UserMediaListService {
                 .category(item.getCategory())
                 .name(item.getName())
                 .year(item.getYear())
+                .avgRating(item.getAvgRating())
                 .genres(item.getGenres().stream()
                         .map(g -> GenreResponse.builder()
                                 .id(g.getId())

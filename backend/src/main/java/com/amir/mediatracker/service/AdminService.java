@@ -205,6 +205,7 @@ public class AdminService {
                 .category(item.getCategory())
                 .name(item.getName())
                 .year(item.getYear())
+                .avgRating(item.getAvgRating())
                 .genres(item.getGenres().stream()
                         .map(this::mapGenreToResponse)
                         .collect(Collectors.toSet()))

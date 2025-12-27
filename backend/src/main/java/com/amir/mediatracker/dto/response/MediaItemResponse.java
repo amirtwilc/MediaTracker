@@ -4,6 +4,7 @@ import com.amir.mediatracker.dto.Category;
 import lombok.Builder;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Set;
 
@@ -14,6 +15,7 @@ public class MediaItemResponse {
     private Category category;
     private String name;
     private Integer year;
+    private BigDecimal avgRating;
     private Set<GenreResponse> genres;
     private Set<PlatformResponse> platforms;
     private LocalDateTime createdAt;

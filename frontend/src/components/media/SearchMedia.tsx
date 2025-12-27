@@ -149,6 +149,9 @@ export const SearchMedia: React.FC = () => {
           case 'category':
             comparison = a.category.localeCompare(b.category);
             break;
+          case 'avgRating':  
+            comparison = (a.avgRating || 0) - (b.avgRating || 0);
+            break;
         }
         
         if (comparison !== 0) {
@@ -427,6 +430,12 @@ export const SearchMedia: React.FC = () => {
                   >
                     Year {getSortIcon('year')}
                   </th>
+                  <th 
+                    className="px-4 py-3 text-left cursor-pointer hover:bg-gray-600"
+                    onClick={() => handleSort('avgRating')}
+                  >
+                    Avg Rating {getSortIcon('avgRating')}
+                  </th>
                   <th className="px-4 py-3 text-left">Genre</th>
                   <th className="px-4 py-3 text-left">Platform</th>
                   <th className="px-4 py-3 text-center">Experienced</th>
@@ -451,6 +460,15 @@ export const SearchMedia: React.FC = () => {
                       </td>
                       <td className="px-4 py-3 text-white font-medium">{item.name}</td>
                       <td className="px-4 py-3 text-gray-300">{item.year || '-'}</td>
+                      <td className="px-4 py-3 text-gray-300">
+                        {item.avgRating ? (
+                          <span className="text-yellow-400 font-medium">
+                            {item.avgRating.toFixed(1)}
+                          </span>
+                        ) : (
+                          '-'
+                        )}
+                      </td>
                       <td className="px-4 py-3">
                         <TruncatedList items={item.genres.map(g => g.name)} />
                       </td>

@@ -20,6 +20,7 @@ export interface MediaItem {
   category: 'MOVIE' | 'SERIES' | 'GAME';
   name: string;
   year?: number;
+  avgRating?: number;  
   genres: Genre[];
   platforms: Platform[];
   createdAt?: string;
