@@ -1,22 +1,123 @@
-import React, { useState } from 'react';
-import { Search, Plus } from 'lucide-react';
-import { MediaItem } from '../../types';
+import React, { useState, useEffect } from 'react';
+import { Search, Plus, Check, Filter, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { MediaItem, UserMediaListItem } from '../../types';
 import { api } from '../../services/api';
 import { TruncatedList } from '../common/TruncatedList';
+import { StarRating } from '../common/StarRating';
 
 export const SearchMedia: React.FC = () => {
   const [query, setQuery] = useState('');
-  const [category, setCategory] = useState('');
   const [results, setResults] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [hasSearched, setHasSearched] = useState(false);
 
-  const handleSearch = async () => {
-    if (!query.trim()) return;
-    
+  // Error notification
+  const [errorMessage, setErrorMessage] = useState<string>('');
+
+  // Filters
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterCategories, setFilterCategories] = useState<string[]>([]);
+  const [filterGenres, setFilterGenres] = useState<string[]>([]);
+  const [filterPlatforms, setFilterPlatforms] = useState<string[]>([]);
+
+  // All available genres and platforms
+  const [allGenres, setAllGenres] = useState<string[]>([]);
+  const [allPlatforms, setAllPlatforms] = useState<string[]>([]);
+
+  // Sorting
+  const [sortConfig, setSortConfig] = useState<Array<{key: string; direction: 'asc' | 'desc'}>>([]);
+
+  // Added items tracking
+  const [addedItems, setAddedItems] = useState<Set<number>>(new Set());
+  const [editingAddedId, setEditingAddedId] = useState<number | null>(null);
+  const [editState, setEditState] = useState<Partial<UserMediaListItem>>({});
+  const [userListItemIds, setUserListItemIds] = useState<Map<number, number>>(new Map());
+
+  useEffect(() => {
+    loadLatestItems();
+    loadGenresAndPlatforms();
+  }, []);
+
+  useEffect(() => {
+    if (query || filterCategories.length > 0 || filterGenres.length > 0 || filterPlatforms.length > 0) {
+      handleSearch(0);
+    } else if (!hasSearched) {
+      loadLatestItems();
+    }
+  }, [filterCategories, filterGenres, filterPlatforms]);
+
+  // Auto-hide error message after 5 seconds
+  useEffect(() => {
+    if (errorMessage) {
+      const timer = setTimeout(() => {
+        setErrorMessage('');
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [errorMessage]);
+
+  const loadLatestItems = async () => {
     setLoading(true);
     try {
-      const data = await api.searchMediaItems(query, category || undefined);
-      setResults(data);
+      // Search with empty query to get latest items
+      const data = await api.searchMediaItems('', undefined, 0, 20);
+      // Sort by year descending (latest first)
+      const sorted = data.sort((a, b) => (b.year || 0) - (a.year || 0));
+      setResults(sorted);
+      setCurrentPage(0);
+      setTotalPages(1);
+      setHasSearched(false);
+    } catch (error) {
+      console.error('Failed to load items', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadGenresAndPlatforms = async () => {
+    try {
+      const [genresData, platformsData] = await Promise.all([
+        api.getAllGenres(),
+        api.getAllPlatforms(),
+      ]);
+      setAllGenres(genresData.map(g => g.name).sort());
+      setAllPlatforms(platformsData.map(p => p.name).sort());
+    } catch (error) {
+      console.error('Failed to load genres/platforms', error);
+    }
+  };
+
+  const handleSearch = async (page: number = 0) => {
+    setLoading(true);
+    setCurrentPage(page);
+    setHasSearched(true);
+    
+    try {
+      const categoryFilter = filterCategories.length === 1 ? filterCategories[0] : undefined;
+      const data = await api.searchMediaItems(query || '', categoryFilter, page, 20);
+      
+      let filtered = data;
+
+      // Client-side filtering for genres and platforms
+      if (filterGenres.length > 0) {
+        filtered = filtered.filter(item =>
+          item.genres.some(g => filterGenres.includes(g.name))
+        );
+      }
+
+      if (filterPlatforms.length > 0) {
+        filtered = filtered.filter(item =>
+          item.platforms.some(p => filterPlatforms.includes(p.name))
+        );
+      }
+
+      // Apply sorting if any
+      const sorted = applySorting(filtered);
+      
+      setResults(sorted);
+      setTotalPages(Math.ceil(sorted.length / 20));
     } catch (error) {
       console.error('Search failed', error);
     } finally {
@@ -24,84 +125,460 @@ export const SearchMedia: React.FC = () => {
     }
   };
 
-  const handleAdd = async (mediaItemId: number) => {
-    try {
-      await api.addToMyList(mediaItemId);
-      alert('Added to your list!');
-    } catch (error: any) {
-      alert(error.message || 'Failed to add item');
+  const handleClearSearch = () => {
+    setQuery('');
+    setHasSearched(false);
+    setSortConfig([]);
+    loadLatestItems();
+  };
+
+  const applySorting = (items: MediaItem[]) => {
+    if (sortConfig.length === 0) return items;
+
+    return [...items].sort((a, b) => {
+      for (const sort of sortConfig) {
+        let comparison = 0;
+        
+        switch (sort.key) {
+          case 'name':
+            comparison = a.name.localeCompare(b.name);
+            break;
+          case 'year':
+            comparison = (a.year || 0) - (b.year || 0);
+            break;
+          case 'category':
+            comparison = a.category.localeCompare(b.category);
+            break;
+        }
+        
+        if (comparison !== 0) {
+          return sort.direction === 'asc' ? comparison : -comparison;
+        }
+      }
+      
+      return 0;
+    });
+  };
+
+  const handleSort = (key: string) => {
+    setSortConfig(current => {
+      const existing = current.find(s => s.key === key);
+      if (existing) {
+        if (existing.direction === 'asc') {
+          return current.map(s => s.key === key ? { ...s, direction: 'desc' as 'desc' } : s);
+        } else {
+          return current.filter(s => s.key !== key);
+        }
+      } else {
+        return [...current, { key, direction: 'asc' as 'asc' }];
+      }
+    });
+
+    // Reapply sorting
+    setResults(applySorting(results));
+  };
+
+  const getSortIcon = (key: string) => {
+    const sort = sortConfig.find(s => s.key === key);
+    if (!sort) return null;
+    
+    const index = sortConfig.findIndex(s => s.key === key);
+    return (
+      <span className="ml-1 text-blue-400 text-xs">
+        {sort.direction === 'asc' ? '↑' : '↓'}
+        {sortConfig.length > 1 && <sup>{index + 1}</sup>}
+      </span>
+    );
+  };
+
+  const toggleFilter = (filterArray: string[], setFilter: (val: string[]) => void, value: string) => {
+    if (filterArray.includes(value)) {
+      setFilter(filterArray.filter(v => v !== value));
+    } else {
+      setFilter([...filterArray, value]);
     }
   };
 
+  const handleAdd = async (mediaItemId: number) => {
+    try {
+      const result = await api.addToMyList(mediaItemId);
+      setAddedItems(new Set(addedItems).add(mediaItemId));
+      setEditingAddedId(mediaItemId);
+      setUserListItemIds(new Map(userListItemIds).set(mediaItemId, result.id));
+      setEditState({
+        experienced: false,
+        wishToReexperience: false,
+        rating: undefined,
+        comment: '',
+      });
+      setErrorMessage(''); // Clear any previous errors
+    } catch (error: any) {
+      // Show error notification instead of alert
+      setErrorMessage(error.message || 'Failed to add item');
+    }
+  };
+
+  const handleSaveUpdate = async (mediaItemId: number) => {
+    const listItemId = userListItemIds.get(mediaItemId);
+    if (!listItemId) return;
+
+    try {
+      await api.updateMyListItem(listItemId, editState);
+      setEditingAddedId(null);
+      setEditState({});
+    } catch (error) {
+      console.error('Failed to update item', error);
+    }
+  };
+
+  const handleCancelUpdate = () => {
+    setEditingAddedId(null);
+    setEditState({});
+  };
+
+  const hasActiveFilters = filterCategories.length > 0 || filterGenres.length > 0 || filterPlatforms.length > 0;
+
   return (
     <div className="space-y-4">
+      {/* Error Notification */}
+      {errorMessage && (
+        <div className="bg-red-900 border border-red-700 text-red-200 px-4 py-3 rounded flex justify-between items-center">
+          <span>{errorMessage}</span>
+          <button
+            onClick={() => setErrorMessage('')}
+            className="text-red-200 hover:text-white"
+          >
+            <X size={18} />
+          </button>
+        </div>
+      )}
+
+      {/* Search Bar */}
       <div className="flex gap-2">
         <input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+          onKeyPress={(e) => e.key === 'Enter' && handleSearch(0)}
           placeholder="Search for movies, series, or games..."
           className="flex-1 px-4 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
         />
-        <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          className="px-4 py-2 bg-gray-700 text-white rounded border border-gray-600"
-        >
-          <option value="">All Categories</option>
-          <option value="MOVIE">Movie</option>
-          <option value="SERIES">Series</option>
-          <option value="GAME">Game</option>
-        </select>
         <button
-          onClick={handleSearch}
+          onClick={() => handleSearch(0)}
           disabled={loading}
           className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium disabled:opacity-50"
         >
           <Search size={20} />
         </button>
+        {hasSearched && query && (
+          <button
+            onClick={handleClearSearch}
+            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded flex items-center gap-2"
+            title="Clear search"
+          >
+            <X size={20} />
+            Clear
+          </button>
+        )}
       </div>
 
-      {loading && <div className="text-center py-8 text-gray-400">Searching...</div>}
+      {/* Filter Toggle Button */}
+      <div className="flex items-center gap-4">
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded border border-gray-700"
+        >
+          <Filter size={18} />
+          {showFilters ? 'Hide Filters' : 'Show Filters'}
+          {showFilters ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+          {hasActiveFilters && !showFilters && (
+            <span className="ml-2 px-2 py-0.5 bg-blue-600 text-xs rounded">Active</span>
+          )}
+        </button>
+      </div>
 
-      {!loading && results.length > 0 && (
-        <div className="grid gap-3">
-          {results.map((item) => (
-            <div key={item.id} className="bg-gray-800 p-4 rounded border border-gray-700 flex justify-between items-start">
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="px-2 py-1 bg-gray-700 text-xs rounded">{item.category}</span>
-                  <h3 className="text-white font-medium">{item.name}</h3>
-                  {item.year && <span className="text-gray-400 text-sm">({item.year})</span>}
-                </div>
-                <div className="text-sm text-gray-400 space-y-1">
-                  <div>
-                    <span className="font-medium">Genres:</span>{' '}
-                    <TruncatedList items={item.genres.map(g => g.name)} />
-                  </div>
-                  <div>
-                    <span className="font-medium">Platforms:</span>{' '}
-                    <TruncatedList items={item.platforms.map(p => p.name)} />
-                  </div>
-                </div>
-              </div>
-              <button
-                onClick={() => handleAdd(item.id)}
-                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded text-sm font-medium flex items-center gap-2"
-              >
-                <Plus size={16} />
-                Add
-              </button>
+      {/* Collapsible Filters */}
+      {showFilters && (
+        <div className="bg-gray-800 p-4 rounded border border-gray-700 space-y-4">
+          <h3 className="text-white font-medium">Filters:</h3>
+
+          <div>
+            <label className="block text-sm text-gray-300 mb-2">Categories:</label>
+            <div className="flex flex-wrap gap-2">
+              {['MOVIE', 'SERIES', 'GAME'].map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => toggleFilter(filterCategories, setFilterCategories, cat)}
+                  className={`px-3 py-1 rounded text-sm ${
+                    filterCategories.includes(cat)
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
             </div>
-          ))}
+          </div>
+
+          {allGenres.length > 0 && (
+            <div>
+              <label className="block text-sm text-gray-300 mb-2">Genres:</label>
+              <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
+                {allGenres.map(genre => (
+                  <button
+                    key={genre}
+                    onClick={() => toggleFilter(filterGenres, setFilterGenres, genre)}
+                    className={`px-3 py-1 rounded text-sm ${
+                      filterGenres.includes(genre)
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    }`}
+                  >
+                    {genre}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {allPlatforms.length > 0 && (
+            <div>
+              <label className="block text-sm text-gray-300 mb-2">Platforms:</label>
+              <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
+                {allPlatforms.map(platform => (
+                  <button
+                    key={platform}
+                    onClick={() => toggleFilter(filterPlatforms, setFilterPlatforms, platform)}
+                    className={`px-3 py-1 rounded text-sm ${
+                      filterPlatforms.includes(platform)
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    }`}
+                  >
+                    {platform}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {hasActiveFilters && (
+            <button
+              onClick={() => {
+                setFilterCategories([]);
+                setFilterGenres([]);
+                setFilterPlatforms([]);
+              }}
+              className="text-sm text-blue-400 hover:text-blue-300"
+            >
+              Clear all filters
+            </button>
+          )}
         </div>
       )}
 
-      {!loading && query && results.length === 0 && (
+      {/* Active Sorts Display */}
+      {sortConfig.length > 0 && (
+        <div className="bg-gray-800 p-3 rounded border border-gray-700">
+          <span className="text-sm text-gray-300">Active sorts: </span>
+          {sortConfig.map((sort, idx) => (
+            <span key={sort.key} className="text-sm text-blue-400 ml-2">
+              {sort.key} {sort.direction === 'asc' ? '↑' : '↓'}
+              {idx < sortConfig.length - 1 && ' → '}
+            </span>
+          ))}
+          <button
+            onClick={() => setSortConfig([])}
+            className="ml-4 text-sm text-red-400 hover:text-red-300"
+          >
+            Clear sorts
+          </button>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="text-center py-8 text-gray-400">Loading...</div>
+      ) : results.length === 0 ? (
         <div className="text-center py-8 text-gray-400">
           No results found. Try a different search term.
         </div>
+      ) : (
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-700 text-gray-300 text-sm">
+                <tr>
+                  <th 
+                    className="px-4 py-3 text-left cursor-pointer hover:bg-gray-600"
+                    onClick={() => handleSort('category')}
+                  >
+                    Category {getSortIcon('category')}
+                  </th>
+                  <th 
+                    className="px-4 py-3 text-left cursor-pointer hover:bg-gray-600"
+                    onClick={() => handleSort('name')}
+                  >
+                    Name {getSortIcon('name')}
+                  </th>
+                  <th 
+                    className="px-4 py-3 text-left cursor-pointer hover:bg-gray-600"
+                    onClick={() => handleSort('year')}
+                  >
+                    Year {getSortIcon('year')}
+                  </th>
+                  <th className="px-4 py-3 text-left">Genre</th>
+                  <th className="px-4 py-3 text-left">Platform</th>
+                  <th className="px-4 py-3 text-center">Experienced</th>
+                  <th className="px-4 py-3 text-center">Re-experience</th>
+                  <th className="px-4 py-3 text-left">Rating</th>
+                  <th className="px-4 py-3 text-left">Comment</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="text-sm">
+                {results.map((item) => {
+                  const isAdded = addedItems.has(item.id);
+                  const isEditing = editingAddedId === item.id;
+                  const currentExperienced = isEditing ? editState.experienced : false;
+
+                  return (
+                    <tr key={item.id} className="border-b border-gray-700 hover:bg-gray-800">
+                      <td className="px-4 py-3">
+                        <span className="px-2 py-1 rounded text-xs bg-gray-700 text-gray-200">
+                          {item.category}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-white font-medium">{item.name}</td>
+                      <td className="px-4 py-3 text-gray-300">{item.year || '-'}</td>
+                      <td className="px-4 py-3">
+                        <TruncatedList items={item.genres.map(g => g.name)} />
+                      </td>
+                      <td className="px-4 py-3">
+                        <TruncatedList items={item.platforms.map(p => p.name)} />
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {isEditing ? (
+                          <input
+                            type="checkbox"
+                            checked={currentExperienced || false}
+                            onChange={(e) => setEditState({
+                              ...editState,
+                              experienced: e.target.checked,
+                              ...(e.target.checked ? {} : { rating: undefined, wishToReexperience: false })
+                            })}
+                            className="w-4 h-4"
+                          />
+                        ) : (
+                          <span>-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {isEditing && currentExperienced ? (
+                          <input
+                            type="checkbox"
+                            checked={editState.wishToReexperience || false}
+                            onChange={(e) => setEditState({
+                              ...editState,
+                              wishToReexperience: e.target.checked
+                            })}
+                            className="w-4 h-4"
+                          />
+                        ) : (
+                          <span>-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {isEditing && currentExperienced ? (
+                          <StarRating
+                            rating={editState.rating}
+                            onChange={(rating) => setEditState({
+                              ...editState,
+                              rating
+                            })}
+                          />
+                        ) : (
+                          <span>-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            maxLength={100}
+                            value={editState.comment || ''}
+                            onChange={(e) => setEditState({
+                              ...editState,
+                              comment: e.target.value
+                            })}
+                            placeholder="Add comment..."
+                            className="w-full px-2 py-1 bg-gray-700 text-white rounded border border-gray-600 text-sm"
+                          />
+                        ) : (
+                          <span>-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {isEditing ? (
+                          <div className="flex gap-2 justify-end">
+                            <button
+                              onClick={() => handleSaveUpdate(item.id)}
+                              className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={handleCancelUpdate}
+                              className="px-2 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded text-xs"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : isAdded ? (
+                          <div className="flex items-center justify-end gap-2 text-green-400">
+                            <Check size={16} />
+                            <span className="text-xs">Added</span>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => handleAdd(item.id)}
+                            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded text-sm font-medium flex items-center gap-2"
+                          >
+                            <Plus size={16} />
+                            Add
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-4">
+              <button
+                onClick={() => handleSearch(currentPage - 1)}
+                disabled={currentPage === 0}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft size={20} />
+              </button>
+              <span className="text-gray-300">
+                Page {currentPage + 1} of {totalPages}
+              </span>
+              <button
+                onClick={() => handleSearch(currentPage + 1)}
+                disabled={currentPage >= totalPages - 1}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronRight size={20} />
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

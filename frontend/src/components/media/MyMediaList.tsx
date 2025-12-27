@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Edit2, Trash2, X } from 'lucide-react';
+import { Edit2, Trash2, X, Filter, ChevronDown, ChevronUp } from 'lucide-react';
 import { UserMediaListItem } from '../../types';
 import { api } from '../../services/api';
 import { ConfirmModal } from '../common/ConfirmModal';
@@ -15,6 +15,7 @@ export const MyMediaList: React.FC = () => {
   const [editState, setEditState] = useState<Partial<UserMediaListItem>>({});
   
   // Filters
+  const [showFilters, setShowFilters] = useState(false);
   const [filterCategories, setFilterCategories] = useState<string[]>([]);
   const [filterGenres, setFilterGenres] = useState<string[]>([]);
   const [filterPlatforms, setFilterPlatforms] = useState<string[]>([]);
@@ -109,14 +110,11 @@ export const MyMediaList: React.FC = () => {
       const existing = current.find(s => s.key === key);
       if (existing) {
         if (existing.direction === 'asc') {
-          // Change to descending
           return current.map(s => s.key === key ? { ...s, direction: 'desc' as 'desc' } : s);
         } else {
-          // Remove this sort
           return current.filter(s => s.key !== key);
         }
       } else {
-        // Add new sort (ascending)
         return [...current, { key, direction: 'asc' as 'asc' }];
       }
     });
@@ -143,26 +141,25 @@ export const MyMediaList: React.FC = () => {
     }
   };
 
+  const hasActiveFilters = filterCategories.length > 0 || filterGenres.length > 0 || 
+                          filterPlatforms.length > 0 || wishToExperienceFilter;
+
   const filteredItems = items
     .filter(item => {
-      // Category filter
       if (filterCategories.length > 0 && !filterCategories.includes(item.mediaItem.category)) {
         return false;
       }
       
-      // Genre filter (at least one genre matches)
       if (filterGenres.length > 0) {
         const hasMatchingGenre = item.mediaItem.genres.some(g => filterGenres.includes(g.name));
         if (!hasMatchingGenre) return false;
       }
       
-      // Platform filter (at least one platform matches)
       if (filterPlatforms.length > 0) {
         const hasMatchingPlatform = item.mediaItem.platforms.some(p => filterPlatforms.includes(p.name));
         if (!hasMatchingPlatform) return false;
       }
       
-      // Wish to experience filter
       if (wishToExperienceFilter) {
         if (item.experienced && !item.wishToReexperience) {
           return false;
@@ -172,7 +169,6 @@ export const MyMediaList: React.FC = () => {
       return true;
     })
     .sort((a, b) => {
-      // Apply multiple sorts in order
       for (const sort of sortConfig) {
         let comparison = 0;
         
@@ -208,100 +204,113 @@ export const MyMediaList: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      {/* Filters */}
-      <div className="bg-gray-800 p-4 rounded border border-gray-700 space-y-4">
-        <div className="flex items-center gap-4">
-          <h3 className="text-white font-medium">Filters:</h3>
-          <label className="flex items-center gap-2 text-white">
-            <input
-              type="checkbox"
-              checked={wishToExperienceFilter}
-              onChange={(e) => setWishToExperienceFilter(e.target.checked)}
-              className="w-4 h-4"
-            />
-            Wish to Experience
-          </label>
-        </div>
-
-        {/* Category Filter */}
-        <div>
-          <label className="block text-sm text-gray-300 mb-2">Categories:</label>
-          <div className="flex flex-wrap gap-2">
-            {['MOVIE', 'SERIES', 'GAME'].map(cat => (
-              <button
-                key={cat}
-                onClick={() => toggleFilter(filterCategories, setFilterCategories, cat)}
-                className={`px-3 py-1 rounded text-sm ${
-                  filterCategories.includes(cat)
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Genre Filter */}
-        {allGenres.length > 0 && (
-          <div>
-            <label className="block text-sm text-gray-300 mb-2">Genres:</label>
-            <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
-              {allGenres.map(genre => (
-                <button
-                  key={genre}
-                  onClick={() => toggleFilter(filterGenres, setFilterGenres, genre)}
-                  className={`px-3 py-1 rounded text-sm ${
-                    filterGenres.includes(genre)
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                  }`}
-                >
-                  {genre}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Platform Filter */}
-        {allPlatforms.length > 0 && (
-          <div>
-            <label className="block text-sm text-gray-300 mb-2">Platforms:</label>
-            <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
-              {allPlatforms.map(platform => (
-                <button
-                  key={platform}
-                  onClick={() => toggleFilter(filterPlatforms, setFilterPlatforms, platform)}
-                  className={`px-3 py-1 rounded text-sm ${
-                    filterPlatforms.includes(platform)
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                  }`}
-                >
-                  {platform}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Clear Filters */}
-        {(filterCategories.length > 0 || filterGenres.length > 0 || filterPlatforms.length > 0 || wishToExperienceFilter) && (
-          <button
-            onClick={() => {
-              setFilterCategories([]);
-              setFilterGenres([]);
-              setFilterPlatforms([]);
-              setWishToExperienceFilter(false);
-            }}
-            className="text-sm text-blue-400 hover:text-blue-300"
-          >
-            Clear all filters
-          </button>
-        )}
+      {/* Filter Toggle Button */}
+      <div className="flex items-center gap-4">
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded border border-gray-700"
+        >
+          <Filter size={18} />
+          {showFilters ? 'Hide Filters' : 'Show Filters'}
+          {showFilters ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+          {hasActiveFilters && !showFilters && (
+            <span className="ml-2 px-2 py-0.5 bg-blue-600 text-xs rounded">Active</span>
+          )}
+        </button>
       </div>
+
+      {/* Collapsible Filters */}
+      {showFilters && (
+        <div className="bg-gray-800 p-4 rounded border border-gray-700 space-y-4">
+          <div className="flex items-center gap-4">
+            <h3 className="text-white font-medium">Filters:</h3>
+            <label className="flex items-center gap-2 text-white">
+              <input
+                type="checkbox"
+                checked={wishToExperienceFilter}
+                onChange={(e) => setWishToExperienceFilter(e.target.checked)}
+                className="w-4 h-4"
+              />
+              Wish to Experience
+            </label>
+          </div>
+
+          <div>
+            <label className="block text-sm text-gray-300 mb-2">Categories:</label>
+            <div className="flex flex-wrap gap-2">
+              {['MOVIE', 'SERIES', 'GAME'].map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => toggleFilter(filterCategories, setFilterCategories, cat)}
+                  className={`px-3 py-1 rounded text-sm ${
+                    filterCategories.includes(cat)
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {allGenres.length > 0 && (
+            <div>
+              <label className="block text-sm text-gray-300 mb-2">Genres:</label>
+              <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
+                {allGenres.map(genre => (
+                  <button
+                    key={genre}
+                    onClick={() => toggleFilter(filterGenres, setFilterGenres, genre)}
+                    className={`px-3 py-1 rounded text-sm ${
+                      filterGenres.includes(genre)
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    }`}
+                  >
+                    {genre}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {allPlatforms.length > 0 && (
+            <div>
+              <label className="block text-sm text-gray-300 mb-2">Platforms:</label>
+              <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
+                {allPlatforms.map(platform => (
+                  <button
+                    key={platform}
+                    onClick={() => toggleFilter(filterPlatforms, setFilterPlatforms, platform)}
+                    className={`px-3 py-1 rounded text-sm ${
+                      filterPlatforms.includes(platform)
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    }`}
+                  >
+                    {platform}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {hasActiveFilters && (
+            <button
+              onClick={() => {
+                setFilterCategories([]);
+                setFilterGenres([]);
+                setFilterPlatforms([]);
+                setWishToExperienceFilter(false);
+              }}
+              className="text-sm text-blue-400 hover:text-blue-300"
+            >
+              Clear all filters
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Active Sorts Display */}
       {sortConfig.length > 0 && (
@@ -396,7 +405,6 @@ export const MyMediaList: React.FC = () => {
                           onChange={(e) => setEditState({
                             ...editState,
                             experienced: e.target.checked,
-                            // Reset rating and reexperience if unchecking experienced
                             ...(e.target.checked ? {} : { rating: undefined, wishToReexperience: false })
                           })}
                           className="w-4 h-4"
@@ -495,7 +503,6 @@ export const MyMediaList: React.FC = () => {
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
       <ConfirmModal
         isOpen={deleteConfirm.show}
         title="Remove Item"
