@@ -1,5 +1,6 @@
 package com.amir.mediatracker.controller;
 
+import com.amir.mediatracker.aop.LogAround;
 import com.amir.mediatracker.dto.Category;
 import com.amir.mediatracker.dto.request.AddMediaRequest;
 import com.amir.mediatracker.dto.request.FollowRequest;
@@ -37,6 +38,7 @@ public class UserController {
     private FollowService followService;
 
     // Search media items
+    @LogAround
     @GetMapping("/media-items/search")
     public ResponseEntity<List<MediaItemResponse>> searchMediaItems(
             @RequestParam String query,
@@ -47,6 +49,7 @@ public class UserController {
     }
 
     // Get user's media list
+    @LogAround
     @GetMapping("/my-list")
     public ResponseEntity<List<UserMediaListResponse>> getMyMediaList(
             @RequestParam(defaultValue = "0") int page,
@@ -57,6 +60,7 @@ public class UserController {
     }
 
     // Add media to user's list
+    @LogAround
     @PostMapping("/my-list")
     public ResponseEntity<UserMediaListResponse> addMediaToList(
             @RequestBody @Valid AddMediaRequest request,
@@ -68,6 +72,7 @@ public class UserController {
     }
 
     // Update media in user's list
+    @LogAround
     @PutMapping("/my-list/{id}")
     public ResponseEntity<UserMediaListResponse> updateMediaListItem(
             @PathVariable Long id,
@@ -80,6 +85,7 @@ public class UserController {
     }
 
     // Delete media from user's list
+    @LogAround
     @DeleteMapping("/my-list/{id}")
     public ResponseEntity<Void> removeMediaFromList(
             @PathVariable Long id,
@@ -90,6 +96,7 @@ public class UserController {
     }
 
     // Follow a user
+    @LogAround
     @PostMapping("/follow")
     public ResponseEntity<UserFollowResponse> followUser(
             @RequestBody @Valid FollowRequest request,
@@ -99,6 +106,7 @@ public class UserController {
     }
 
     // Unfollow a user
+    @LogAround
     @DeleteMapping("/follow/{followUserId}")
     public ResponseEntity<Void> unfollowUser(
             @PathVariable Long followUserId,
@@ -109,6 +117,7 @@ public class UserController {
     }
 
     // Update follow threshold
+    @LogAround
     @PutMapping("/follow/{userId}/threshold")
     public ResponseEntity<UserFollowResponse> updateFollowThreshold(
             @PathVariable Long followUserId,
@@ -121,6 +130,7 @@ public class UserController {
     }
 
     // Get my followers
+    @LogAround
     @GetMapping("/followers")
     public ResponseEntity<List<UserResponse>> getMyFollowers(
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
@@ -129,6 +139,7 @@ public class UserController {
     }
 
     // Get users I'm following
+    @LogAround
     @GetMapping("/following")
     public ResponseEntity<List<UserFollowResponse>> getMyFollowing(
             @AuthenticationPrincipal UserPrincipal userPrincipal) {

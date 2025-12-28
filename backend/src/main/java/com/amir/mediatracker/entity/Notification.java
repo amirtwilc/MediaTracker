@@ -33,7 +33,7 @@ public class Notification {
 
     private Short rating;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "rated_by_user_id", nullable = false)
     private User ratedByUser;
 

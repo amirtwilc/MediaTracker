@@ -18,4 +18,8 @@ public interface UserMediaListRepository extends JpaRepository<UserMediaList, Lo
     Optional<UserMediaList> findByUserIdAndMediaItemId(Long userId, Long mediaItemId);
 
     List<UserMediaList> findAllByMediaItemIdAndRatingIsNotNull(Long mediaItemId);
+
+    long countByUserIdAndRatingIsNotNull(Long userId);
+    List<UserMediaList> findByUserIdAndMediaItemIdInAndRatingIsNotNull(
+            Long userId, List<Long> mediaItemIds);
 }

@@ -38,6 +38,10 @@ export const FollowManagement: React.FC = () => {
     }
   };
 
+  const handleViewProfile = (userId: number) => {
+    window.location.href = `#/user/${userId}`;
+  };
+
   if (loading) {
     return <div className="text-center py-8 text-gray-400">Loading...</div>;
   }
@@ -74,12 +78,13 @@ export const FollowManagement: React.FC = () => {
               You're not following anyone yet
             </div>
           ) : (
-            following.map((follow) => (
-              <div
-                key={follow.id}
-                className="bg-gray-800 p-4 rounded border border-gray-700 flex justify-between items-center"
-              >
-                <div>
+              following.map((follow) => (
+                <div
+                  key={follow.id}
+                  className="bg-gray-800 p-4 rounded border border-gray-700 flex justify-between items-center cursor-pointer hover:bg-gray-750"
+                  onClick={() => handleViewProfile(follow.user.id)}
+                >
+                  <div>
                   <p className="text-white font-medium">{follow.user.username}</p>
                   <p className="text-sm text-gray-400">
                     Notify when rating ≥ {follow.minimumRatingThreshold}
@@ -105,7 +110,8 @@ export const FollowManagement: React.FC = () => {
             followers.map((user) => (
               <div
                 key={user.id}
-                className="bg-gray-800 p-4 rounded border border-gray-700"
+                className="bg-gray-800 p-4 rounded border border-gray-700 cursor-pointer hover:bg-gray-750"
+                onClick={() => handleViewProfile(user.id)}
               >
                 <p className="text-white font-medium">{user.username}</p>
                 <p className="text-sm text-gray-400">{user.email}</p>

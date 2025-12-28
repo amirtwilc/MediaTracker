@@ -258,6 +258,55 @@ class ApiClient {
     if (!res.ok) throw new Error('Failed to get job status');
     return res.json();
   }
+
+  async searchUsers(request: any, page = 0, size = 20): Promise<any> {
+    const res = await fetch(`${API_BASE}/users/search?page=${page}&size=${size}`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(request),
+    });
+    
+    if (!res.ok) throw new Error('Failed to search users');
+    return res.json();
+  }
+
+  async getUserProfile(userId: number): Promise<any> {
+    const res = await fetch(`${API_BASE}/users/${userId}/profile`, {
+      headers: this.getHeaders(),
+    });
+    
+    if (!res.ok) throw new Error('Failed to fetch user profile');
+    return res.json();
+  }
+
+  async getUserMediaList(userId: number, page = 0, size = 100): Promise<any> {
+    const res = await fetch(`${API_BASE}/users/${userId}/list?page=${page}&size=${size}`, {
+      headers: this.getHeaders(),
+    });
+    
+    if (!res.ok) throw new Error('Failed to fetch user list');
+    return res.json();
+  }
+
+  async getUserSettings(): Promise<any> {
+    const res = await fetch(`${API_BASE}/users/settings`, {
+      headers: this.getHeaders(),
+    });
+    
+    if (!res.ok) throw new Error('Failed to fetch settings');
+    return res.json();
+  }
+
+  async updateUserSettings(settings: any): Promise<any> {
+    const res = await fetch(`${API_BASE}/users/settings`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify(settings),
+    });
+    
+    if (!res.ok) throw new Error('Failed to update settings');
+    return res.json();
+  }
 }
 
 export const api = new ApiClient();

@@ -13,6 +13,7 @@ import com.amir.mediatracker.exception.ResourceNotFoundException;
 import com.amir.mediatracker.repository.MediaItemRepository;
 import com.amir.mediatracker.repository.UserMediaListRepository;
 import com.amir.mediatracker.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -27,21 +28,26 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-@Service
 @Slf4j
+@Service
+@RequiredArgsConstructor
 public class UserMediaListService {
 
-    @Autowired
-    private UserMediaListRepository userMediaListRepository;
+    private final UserMediaListRepository userMediaListRepository;
 
-    @Autowired
-    private MediaItemRepository mediaItemRepository;
+    private final MediaItemRepository mediaItemRepository;
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
 
-    @Autowired
-    private RatingService ratingService;
+    private final RatingService ratingService;
+
+    private void updateLastActive(Long userId) {
+        User user = userRepository.findById(userId).orElse(null);
+        if (user != null) {
+            user.setLastActive(LocalDateTime.now());
+            userRepository.save(user);
+        }
+    }
 
     public List<UserMediaListResponse> getUserMediaList(Long userId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("mediaItem.name").ascending());
@@ -53,6 +59,7 @@ public class UserMediaListService {
 
     @Transactional
     public UserMediaListResponse addMediaToList(Long userId, Long mediaItemId) {
+        updateLastActive(userId);
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
@@ -80,7 +87,7 @@ public class UserMediaListService {
     @Transactional
     public UserMediaListResponse updateMediaListItem(
             Long userId, Long listItemId, UpdateMediaListRequest request) {
-
+        updateLastActive(userId);
         UserMediaList listItem = userMediaListRepository
                 .findByIdAndUserId(listItemId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Media list item not found"));
@@ -110,6 +117,7 @@ public class UserMediaListService {
 
     @Transactional
     public void removeMediaFromList(Long userId, Long listItemId) {
+        updateLastActive(userId);
         UserMediaList listItem = userMediaListRepository
                 .findByIdAndUserId(listItemId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Media list item not found"));

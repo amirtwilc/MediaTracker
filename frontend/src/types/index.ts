@@ -3,6 +3,42 @@ export interface User {
   username: string;
   email: string;
   role: 'USER' | 'ADMIN';
+  createdAt?: string;
+  ratingsCount?: number;
+}
+
+export interface UserProfile {
+  id: number;
+  username: string;
+  email?: string;
+  role: 'USER' | 'ADMIN';
+  createdAt: string;
+  lastActive: string;
+  ratingsCount: number;
+  followersCount: number;
+  isFollowing: boolean;
+}
+
+export interface UserSearchRequest {
+  username?: string;
+  adminOnly?: boolean;
+  sortBy?: string;
+  sortDirection?: string;
+  category?: string;
+  genreIds?: number[];
+  platformIds?: number[];
+  itemRatingCriteria?: ItemRatingCriteria[];
+}
+
+export interface ItemRatingCriteria {
+  mediaItemId: number;
+  minRating: number;
+  maxRating: number;
+}
+
+export interface UserSettings {
+  isInvisible: boolean;
+  showEmail: boolean;
 }
 
 export interface Genre {

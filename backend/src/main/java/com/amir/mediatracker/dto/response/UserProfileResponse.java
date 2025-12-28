@@ -8,11 +8,14 @@ import java.time.LocalDateTime;
 
 @Data
 @Builder
-public class UserResponse {
+public class UserProfileResponse {
     private Long id;
     private String username;
     private String email;
     private Role role;
     private LocalDateTime createdAt;
+    private LocalDateTime lastActive;
     private Long ratingsCount;
+    private Long followersCount;
+    private Boolean isFollowing; // Whether current user follows this user
 }

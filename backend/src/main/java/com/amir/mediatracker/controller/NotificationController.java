@@ -1,12 +1,15 @@
 package com.amir.mediatracker.controller;
 
+import com.amir.mediatracker.aop.LogAround;
 import com.amir.mediatracker.dto.response.NotificationResponse;
 import com.amir.mediatracker.entity.User;
+import com.amir.mediatracker.security.dto.UserPrincipal;
 import com.amir.mediatracker.service.NotificationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -22,38 +25,43 @@ public class NotificationController {
 
     // Get user's notifications
     @GetMapping
+    @LogAround
     public ResponseEntity<List<NotificationResponse>> getNotifications(
             @RequestParam(required = false, defaultValue = "false") boolean onlyUnread,
-            Authentication authentication) {
-        User user = (User) authentication.getPrincipal();
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        Long userId = userPrincipal.getId();
         return ResponseEntity.ok(
-                notificationService.getNotifications(user.getId(), onlyUnread)
+                notificationService.getNotifications(userId, onlyUnread)
         );
     }
 
     // Mark notification as read
     @PutMapping("/{id}/read")
+    @LogAround
     public ResponseEntity<NotificationResponse> markAsRead(
             @PathVariable Long id,
-            Authentication authentication) {
-        User user = (User) authentication.getPrincipal();
-        return ResponseEntity.ok(notificationService.markAsRead(user.getId(), id));
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        Long userId = userPrincipal.getId();
+        return ResponseEntity.ok(notificationService.markAsRead(userId, id));
     }
 
     // Mark all notifications as read
     @PutMapping("/read-all")
-    public ResponseEntity<Void> markAllAsRead(Authentication authentication) {
-        User user = (User) authentication.getPrincipal();
-        notificationService.markAllAsRead(user.getId());
+    @LogAround
+    public ResponseEntity<Void> markAllAsRead(Authentication authentication,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        Long userId = userPrincipal.getId();
+        notificationService.markAllAsRead(userId);
         return ResponseEntity.noContent().build();
     }
 
     // Get unread count
     @GetMapping("/unread-count")
+    @LogAround
     public ResponseEntity<Map<String, Long>> getUnreadCount(
-            Authentication authentication) {
-        User user = (User) authentication.getPrincipal();
-        long count = notificationService.getUnreadCount(user.getId());
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        Long userId = userPrincipal.getId();
+        long count = notificationService.getUnreadCount(userId);
         return ResponseEntity.ok(Map.of("unreadCount", count));
     }
 }

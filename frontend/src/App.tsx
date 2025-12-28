@@ -8,10 +8,14 @@ import { FollowManagement } from './components/follow/FollowManagement';
 import { AdminPanel } from './components/admin/AdminPanel';
 import { NotificationsPanel } from './components/notifications/NotificationsPanel';
 import { api } from './services/api';
+import { UserSearch } from './components/users/UserSearch';
+import { UserProfile } from './components/users/UserProfile';
+import { Settings } from './components/settings/Settings';
 
 const App: React.FC = () => {
   const { user, logout, isAdmin } = useAuth();
-  const [activeView, setActiveView] = useState<'myList' | 'search' | 'follow' | 'admin'>('myList');
+  const [activeView, setActiveView] = useState<'myList' | 'search' | 'follow' | 'admin' | 'users' | 'settings'>('myList');
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -22,6 +26,27 @@ const App: React.FC = () => {
       return () => clearInterval(interval);
     }
   }, [user]);
+
+  useEffect(() => {
+  const handleHashChange = () => {
+    const hash = window.location.hash;
+    const match = hash.match(/#\/user\/(\d+)/);
+    if (match) {
+      const newUserId = parseInt(match[1]);
+      // Force update even if same user
+      setSelectedUserId(null);
+      setTimeout(() => {
+        setSelectedUserId(newUserId);
+        setActiveView('users');
+      }, 0);
+    }
+  };
+
+    window.addEventListener('hashchange', handleHashChange);
+    handleHashChange(); // Check on mount
+
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   const loadUnreadCount = async () => {
     try {
@@ -114,6 +139,24 @@ const App: React.FC = () => {
                 Admin Panel
               </button>
             )}
+            <button
+              onClick={() => setActiveView('users')}
+              className={`px-4 py-3 font-medium whitespace-nowrap ${activeView === 'users'
+                  ? 'text-white border-b-2 border-blue-500'
+                  : 'text-gray-400 hover:text-white'
+                }`}
+            >
+              Users
+            </button>
+            <button
+              onClick={() => setActiveView('settings')}
+              className={`px-4 py-3 font-medium whitespace-nowrap ${activeView === 'settings'
+                  ? 'text-white border-b-2 border-blue-500'
+                  : 'text-gray-400 hover:text-white'
+                }`}
+            >
+              Settings
+            </button>
           </div>
         </div>
       </nav>
@@ -124,6 +167,15 @@ const App: React.FC = () => {
         {activeView === 'search' && <SearchMedia />}
         {activeView === 'follow' && <FollowManagement />}
         {activeView === 'admin' && isAdmin && <AdminPanel />}
+        {activeView === 'users' && !selectedUserId && <UserSearch />}
+        {activeView === 'users' && selectedUserId && (
+          <UserProfile
+            key={selectedUserId}
+            userId={selectedUserId}
+            onBack={() => setSelectedUserId(null)}
+          />
+        )}
+        {activeView === 'settings' && <Settings />}
       </main>
 
       {/* Notifications Modal */}

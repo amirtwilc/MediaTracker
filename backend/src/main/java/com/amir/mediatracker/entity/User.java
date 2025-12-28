@@ -35,6 +35,15 @@ public class User {
     @Column(nullable = false)
     private Role role;
 
+    @Column(name = "is_invisible", nullable = false)
+    private Boolean isInvisible = false;
+
+    @Column(name = "show_email", nullable = false)
+    private Boolean showEmail = false;
+
+    @Column(name = "last_active")
+    private LocalDateTime lastActive;
+
     @CreatedDate
     private LocalDateTime createdAt;
 
