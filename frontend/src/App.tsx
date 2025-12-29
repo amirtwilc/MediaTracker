@@ -16,6 +16,7 @@ const App: React.FC = () => {
   const { user, logout, isAdmin } = useAuth();
   const [activeView, setActiveView] = useState<'myList' | 'search' | 'follow' | 'admin' | 'users' | 'settings'>('myList');
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const [previousView, setPreviousView] = useState<'myList' | 'search' | 'follow' | 'admin' | 'users' | 'settings'>('users');
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -27,27 +28,6 @@ const App: React.FC = () => {
     }
   }, [user]);
 
-  useEffect(() => {
-  const handleHashChange = () => {
-    const hash = window.location.hash;
-    const match = hash.match(/#\/user\/(\d+)/);
-    if (match) {
-      const newUserId = parseInt(match[1]);
-      // Force update even if same user
-      setSelectedUserId(null);
-      setTimeout(() => {
-        setSelectedUserId(newUserId);
-        setActiveView('users');
-      }, 0);
-    }
-  };
-
-    window.addEventListener('hashchange', handleHashChange);
-    handleHashChange(); // Check on mount
-
-    return () => window.removeEventListener('hashchange', handleHashChange);
-  }, []);
-
   const loadUnreadCount = async () => {
     try {
       const count = await api.getUnreadCount();
@@ -55,6 +35,17 @@ const App: React.FC = () => {
     } catch (error) {
       console.error('Failed to load unread count', error);
     }
+  };
+
+  const handleViewUser = (userId: number) => {
+    setPreviousView(activeView);
+    setSelectedUserId(userId);
+    setActiveView('users');
+  };
+
+  const handleBackFromProfile = () => {
+    setSelectedUserId(null);
+    setActiveView(previousView);
   };
 
   if (!user) {
@@ -98,7 +89,10 @@ const App: React.FC = () => {
         <div className="container mx-auto px-4">
           <div className="flex gap-2 overflow-x-auto">
             <button
-              onClick={() => setActiveView('myList')}
+              onClick={() => {
+                setActiveView('myList');
+                setSelectedUserId(null);
+              }}
               className={`px-4 py-3 font-medium whitespace-nowrap ${
                 activeView === 'myList'
                   ? 'text-white border-b-2 border-blue-500'
@@ -108,7 +102,10 @@ const App: React.FC = () => {
               My List
             </button>
             <button
-              onClick={() => setActiveView('search')}
+              onClick={() => {
+                setActiveView('search');
+                setSelectedUserId(null);
+              }}
               className={`px-4 py-3 font-medium whitespace-nowrap ${
                 activeView === 'search'
                   ? 'text-white border-b-2 border-blue-500'
@@ -118,7 +115,10 @@ const App: React.FC = () => {
               Search Media
             </button>
             <button
-              onClick={() => setActiveView('follow')}
+              onClick={() => {
+                setActiveView('follow');
+                setSelectedUserId(null);
+              }}
               className={`px-4 py-3 font-medium whitespace-nowrap ${
                 activeView === 'follow'
                   ? 'text-white border-b-2 border-blue-500'
@@ -129,7 +129,10 @@ const App: React.FC = () => {
             </button>
             {isAdmin && (
               <button
-                onClick={() => setActiveView('admin')}
+                onClick={() => {
+                  setActiveView('admin');
+                  setSelectedUserId(null);
+                }}
                 className={`px-4 py-3 font-medium whitespace-nowrap ${
                   activeView === 'admin'
                     ? 'text-white border-b-2 border-blue-500'
@@ -140,20 +143,28 @@ const App: React.FC = () => {
               </button>
             )}
             <button
-              onClick={() => setActiveView('users')}
-              className={`px-4 py-3 font-medium whitespace-nowrap ${activeView === 'users'
+              onClick={() => {
+                setActiveView('users');
+                setSelectedUserId(null);
+              }}
+              className={`px-4 py-3 font-medium whitespace-nowrap ${
+                activeView === 'users' && !selectedUserId
                   ? 'text-white border-b-2 border-blue-500'
                   : 'text-gray-400 hover:text-white'
-                }`}
+              }`}
             >
               Users
             </button>
             <button
-              onClick={() => setActiveView('settings')}
-              className={`px-4 py-3 font-medium whitespace-nowrap ${activeView === 'settings'
+              onClick={() => {
+                setActiveView('settings');
+                setSelectedUserId(null);
+              }}
+              className={`px-4 py-3 font-medium whitespace-nowrap ${
+                activeView === 'settings'
                   ? 'text-white border-b-2 border-blue-500'
                   : 'text-gray-400 hover:text-white'
-                }`}
+              }`}
             >
               Settings
             </button>
@@ -165,14 +176,14 @@ const App: React.FC = () => {
       <main className="container mx-auto px-4 py-6">
         {activeView === 'myList' && <MyMediaList />}
         {activeView === 'search' && <SearchMedia />}
-        {activeView === 'follow' && <FollowManagement />}
+        {activeView === 'follow' && <FollowManagement onViewUser={handleViewUser} />}
         {activeView === 'admin' && isAdmin && <AdminPanel />}
-        {activeView === 'users' && !selectedUserId && <UserSearch />}
+        {activeView === 'users' && !selectedUserId && <UserSearch onViewUser={handleViewUser} />}
         {activeView === 'users' && selectedUserId && (
           <UserProfile
             key={selectedUserId}
             userId={selectedUserId}
-            onBack={() => setSelectedUserId(null)}
+            onBack={handleBackFromProfile}
           />
         )}
         {activeView === 'settings' && <Settings />}

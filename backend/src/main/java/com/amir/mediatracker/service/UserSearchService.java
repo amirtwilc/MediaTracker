@@ -137,7 +137,6 @@ public class UserSearchService {
                 break;
         }
 
-        // CHANGE THIS LOGIC - if NOT ascending, reverse the comparator
         if (!ascending) {
             comparator = comparator.reversed();
         }

@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, UserPlus, Check } from 'lucide-react';
+import { Search, Filter, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, UserPlus, Check, X } from 'lucide-react';
 import { UserProfile } from '../../types';
 import { api } from '../../services/api';
 
-export const UserSearch: React.FC = () => {
+interface UserSearchProps {
+  onViewUser: (userId: number) => void;
+}
+
+export const UserSearch: React.FC<UserSearchProps> = ({ onViewUser }) => {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
@@ -13,8 +17,7 @@ export const UserSearch: React.FC = () => {
   const [username, setUsername] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [adminOnly, setAdminOnly] = useState<boolean | undefined>(undefined);
-  const [sortBy, setSortBy] = useState('lastActive');
-  const [sortDirection, setSortDirection] = useState('asc');
+  const [sortConfig, setSortConfig] = useState({ by: 'lastActive', direction: 'desc' });
 
   // Following state
   const [followingUsers, setFollowingUsers] = useState<Set<number>>(new Set());
@@ -27,6 +30,11 @@ export const UserSearch: React.FC = () => {
   useEffect(() => {
     loadUsers(0);
   }, [adminOnly]);
+
+  // Watch for sortConfig changes
+  useEffect(() => {
+    loadUsers(currentPage);
+  }, [sortConfig]);
 
   // Auto-search when username is cleared
   useEffect(() => {
@@ -47,8 +55,8 @@ export const UserSearch: React.FC = () => {
       const request = {
         username: username || undefined,
         adminOnly,
-        sortBy,
-        sortDirection,
+        sortBy: sortConfig.by,
+        sortDirection: sortConfig.direction,
       };
 
       const response = await api.searchUsers(request, page, 20);
@@ -87,27 +95,33 @@ export const UserSearch: React.FC = () => {
     }
   };
 
-  const handleViewProfile = (userId: number) => {
-    window.location.href = `#/user/${userId}`;
-  };
-
   const handleSort = (column: string) => {
-    if (sortBy === column) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(column);
-      setSortDirection('desc');
-    }
-    setTimeout(() => loadUsers(0), 100);
+    setSortConfig(prev => {
+      if (prev.by === column) {
+        // Toggle direction for same column
+        return { by: column, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
+      } else {
+        // New column - default to desc (newest/highest first)
+        return { by: column, direction: 'desc' };
+      }
+    });
   };
 
   const getSortIcon = (column: string) => {
-    if (sortBy !== column) return null;
+    if (sortConfig.by !== column) return null;
     return (
       <span className="ml-1 text-blue-400">
-        {sortDirection === 'desc' ? '↓' : '↑'}
+        {sortConfig.direction === 'desc' ? '↓' : '↑'}
       </span>
     );
+  };
+
+  const toggleFilter = (filterArray: string[], setFilter: (val: string[]) => void, value: string) => {
+    if (filterArray.includes(value)) {
+      setFilter(filterArray.filter(v => v !== value));
+    } else {
+      setFilter([...filterArray, value]);
+    }
   };
 
   const hasActiveFilters = adminOnly !== undefined;
@@ -116,14 +130,28 @@ export const UserSearch: React.FC = () => {
     <div className="space-y-4">
       {/* Search Bar */}
       <div className="flex gap-2">
-        <input
-          type="text"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-          placeholder="Search users by username..."
-          className="flex-1 px-4 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
-        />
+        <div className="flex-1 relative">
+          <input
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+            placeholder="Search users by username..."
+            className="w-full px-4 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
+          />
+          {username && (
+            <button
+              onClick={() => {
+                setUsername('');
+                loadUsers(0);
+              }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+              title="Clear search"
+            >
+              <X size={18} />
+            </button>
+          )}
+        </div>
         <button
           onClick={handleSearch}
           disabled={loading}
@@ -147,16 +175,16 @@ export const UserSearch: React.FC = () => {
           )}
         </button>
 
-        {sortBy && (
+        {sortConfig.by && (
           <div className="text-sm text-gray-400">
             Sorted by: <span className="text-blue-400">
-              {sortBy === 'registrationDate' && 'Registration Date'}
-              {sortBy === 'lastActive' && 'Last Active'}
-              {sortBy === 'ratingsCount' && 'Ratings'}
-              {sortBy === 'followersCount' && 'Followers'}
+              {sortConfig.by === 'registrationDate' && 'Registration Date'}
+              {sortConfig.by === 'lastActive' && 'Last Active'}
+              {sortConfig.by === 'ratingsCount' && 'Ratings'}
+              {sortConfig.by === 'followersCount' && 'Followers'}
             </span>
             {' '}
-            ({sortDirection === 'desc' ? 'Oldest/Lowest First' : 'Newest/Highest First'})
+            ({sortConfig.direction === 'desc' ? 'Newest/Highest First' : 'Oldest/Lowest First'})
           </div>
         )}
       </div>
@@ -258,7 +286,7 @@ export const UserSearch: React.FC = () => {
                   <tr
                     key={user.id}
                     className="border-b border-gray-700 hover:bg-gray-800 cursor-pointer"
-                    onClick={() => handleViewProfile(user.id)}
+                    onClick={() => onViewUser(user.id)}
                   >
                     <td className="px-4 py-3 text-white font-medium">{user.username}</td>
                     <td className="px-4 py-3">
