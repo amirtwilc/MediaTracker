@@ -3,6 +3,7 @@ package com.amir.mediatracker.service;
 import com.amir.mediatracker.dto.Category;
 import com.amir.mediatracker.dto.response.GenreResponse;
 import com.amir.mediatracker.dto.response.MediaItemResponse;
+import com.amir.mediatracker.dto.response.MediaSearchResponse;
 import com.amir.mediatracker.dto.response.PlatformResponse;
 import com.amir.mediatracker.entity.MediaItem;
 import com.amir.mediatracker.repository.MediaItemRepository;
@@ -16,6 +17,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -24,6 +26,54 @@ public class MediaItemService {
 
     @Autowired
     private MediaItemRepository mediaItemRepository;
+
+    public MediaSearchResponse searchMediaItemsCursor(
+            String query,
+            Category category,
+            Set<Long> genreIds,
+            Set<Long> platformIds,
+            String cursorName,
+            Long cursorId,
+            int limit
+    ) {
+        Pageable pageable = PageRequest.of(0, limit + 1);
+
+        Set<Long> safeGenres = genreIds == null ? Set.of() : genreIds;
+        Set<Long> safePlatforms = platformIds == null ? Set.of() : platformIds;
+
+        List<MediaItem> items = mediaItemRepository.searchWithCursorAndFilters(
+                query,
+                category,
+                safeGenres.isEmpty() ? null : safeGenres,
+                safePlatforms.isEmpty() ? null : safePlatforms,
+                safeGenres.size(),
+                safePlatforms.size(),
+                cursorName,
+                cursorId,
+                pageable
+        );
+
+        boolean hasMore = items.size() > limit;
+        if (hasMore) {
+            items = items.subList(0, limit);
+        }
+
+        List<MediaItemResponse> responses = items.stream()
+                .map(this::mapToResponse)
+                .toList();
+
+        MediaSearchResponse.Cursor nextCursor = null;
+        if (hasMore) {
+            MediaItem last = items.get(items.size() - 1);
+            nextCursor = new MediaSearchResponse.Cursor(last.getName(), last.getId());
+        }
+
+        return MediaSearchResponse.builder()
+                .items(responses)
+                .nextCursor(nextCursor)
+                .hasMore(hasMore)
+                .build();
+    }
 
     public List<MediaItemResponse> searchMediaItems(String query, Category category, int page, int size) {
         Page<MediaItem> items;

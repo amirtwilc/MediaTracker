@@ -26,4 +26,53 @@ public interface MediaItemRepository extends JpaRepository<MediaItem, Long> {
 
     @Query("SELECT DISTINCT m FROM MediaItem m JOIN m.platforms p WHERE LOWER(m.name) LIKE LOWER(CONCAT('%', :name, '%')) AND p.id IN :platformIds")
     List<MediaItem> searchByNameAndPlatforms(@Param("name") String name, @Param("platformIds") Set<Long> platformIds);
+
+    @Query("""
+            SELECT m FROM MediaItem m
+            WHERE LOWER(m.name) LIKE LOWER(CONCAT('%', :name, '%'))
+            AND (:category IS NULL OR m.category = :category)
+            AND (
+                :cursorName IS NULL OR
+                (m.name > :cursorName OR (m.name = :cursorName AND m.id > :cursorId))
+            )
+            ORDER BY m.name ASC, m.id ASC
+            """)
+    List<MediaItem> searchWithCursor(
+            @Param("name") String name,
+            @Param("category") Category category,
+            @Param("cursorName") String cursorName,
+            @Param("cursorId") Long cursorId,
+            Pageable pageable
+    );
+
+    @Query("""
+            SELECT m FROM MediaItem m
+            JOIN m.genres g
+            JOIN m.platforms p
+            WHERE LOWER(m.name) LIKE LOWER(CONCAT('%', :name, '%'))
+            AND (:category IS NULL OR m.category = :category)
+            AND (:genreIds IS NULL OR g.id IN :genreIds)
+            AND (:platformIds IS NULL OR p.id IN :platformIds)
+            AND (
+                :cursorName IS NULL OR
+                (m.name > :cursorName OR (m.name = :cursorName AND m.id > :cursorId))
+            )
+            GROUP BY m
+            HAVING
+                (:genreCount = 0 OR COUNT(DISTINCT g.id) = :genreCount)
+            AND (:platformCount = 0 OR COUNT(DISTINCT p.id) = :platformCount)
+            ORDER BY m.name ASC, m.id ASC
+            """)
+    List<MediaItem> searchWithCursorAndFilters(
+            @Param("name") String name,
+            @Param("category") Category category,
+            @Param("genreIds") Set<Long> genreIds,
+            @Param("platformIds") Set<Long> platformIds,
+            @Param("genreCount") long genreCount,
+            @Param("platformCount") long platformCount,
+            @Param("cursorName") String cursorName,
+            @Param("cursorId") Long cursorId,
+            Pageable pageable
+    );
+
 }

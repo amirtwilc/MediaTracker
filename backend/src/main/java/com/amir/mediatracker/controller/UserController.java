@@ -6,10 +6,7 @@ import com.amir.mediatracker.dto.request.AddMediaRequest;
 import com.amir.mediatracker.dto.request.FollowRequest;
 import com.amir.mediatracker.dto.request.UpdateMediaListRequest;
 import com.amir.mediatracker.dto.request.UpdateThresholdRequest;
-import com.amir.mediatracker.dto.response.MediaItemResponse;
-import com.amir.mediatracker.dto.response.UserFollowResponse;
-import com.amir.mediatracker.dto.response.UserMediaListResponse;
-import com.amir.mediatracker.dto.response.UserResponse;
+import com.amir.mediatracker.dto.response.*;
 import com.amir.mediatracker.security.dto.UserPrincipal;
 import com.amir.mediatracker.service.FollowService;
 import com.amir.mediatracker.service.MediaItemService;
@@ -22,6 +19,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/media-tracker/user")
@@ -40,12 +38,26 @@ public class UserController {
     // Search media items
     @LogAround
     @GetMapping("/media-items/search")
-    public ResponseEntity<List<MediaItemResponse>> searchMediaItems(
+    public ResponseEntity<MediaSearchResponse> searchMediaItems(
             @RequestParam String query,
             @RequestParam(required = false) Category category,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        return ResponseEntity.ok(mediaItemService.searchMediaItems(query, category, page, size));
+            @RequestParam(required = false) Set<Long> genreIds,
+            @RequestParam(required = false) Set<Long> platformIds,
+            @RequestParam(required = false) String cursorName,
+            @RequestParam(required = false) Long cursorId,
+            @RequestParam(defaultValue = "20") int limit
+    ) {
+        return ResponseEntity.ok(
+                mediaItemService.searchMediaItemsCursor(
+                        query,
+                        category,
+                        genreIds,
+                        platformIds,
+                        cursorName,
+                        cursorId,
+                        limit
+                )
+        );
     }
 
     // Get user's media list

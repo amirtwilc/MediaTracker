@@ -19,28 +19,6 @@ export interface UserProfile {
   isFollowing: boolean;
 }
 
-export interface UserSearchRequest {
-  username?: string;
-  adminOnly?: boolean;
-  sortBy?: string;
-  sortDirection?: string;
-  category?: string;
-  genreIds?: number[];
-  platformIds?: number[];
-  itemRatingCriteria?: ItemRatingCriteria[];
-}
-
-export interface ItemRatingCriteria {
-  mediaItemId: number;
-  minRating: number;
-  maxRating: number;
-}
-
-export interface UserSettings {
-  isInvisible: boolean;
-  showEmail: boolean;
-}
-
 export interface Genre {
   id: number;
   name: string;

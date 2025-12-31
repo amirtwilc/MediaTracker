@@ -365,9 +365,9 @@ export const SearchMedia: React.FC = () => {
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm text-gray-300 mb-2">Genres:</label>
-            {allGenres.length > 0 ? (
+          {allGenres.length > 0 && (
+            <div>
+              <label className="block text-sm text-gray-300 mb-2">Genres:</label>
               <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
                 {allGenres.map(genre => (
                   <button
@@ -383,14 +383,12 @@ export const SearchMedia: React.FC = () => {
                   </button>
                 ))}
               </div>
-            ) : (
-              <div className="text-sm text-gray-400">Loading genres...</div>
-            )}
-          </div>
+            </div>
+          )}
 
-          <div>
-            <label className="block text-sm text-gray-300 mb-2">Platforms:</label>
-            {allPlatforms.length > 0 ? (
+          {allPlatforms.length > 0 && (
+            <div>
+              <label className="block text-sm text-gray-300 mb-2">Platforms:</label>
               <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
                 {allPlatforms.map(platform => (
                   <button
@@ -406,10 +404,8 @@ export const SearchMedia: React.FC = () => {
                   </button>
                 ))}
               </div>
-            ) : (
-              <div className="text-sm text-gray-400">Loading platforms...</div>
-            )}
-          </div>
+            </div>
+          )}
 
           {hasActiveFilters && (
             <button

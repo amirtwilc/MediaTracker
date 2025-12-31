@@ -7,14 +7,14 @@ class ApiClient {
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
     };
-    
+
     if (includeAuth) {
       const token = localStorage.getItem('token');
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
     }
-    
+
     return headers;
   }
 
@@ -24,7 +24,7 @@ class ApiClient {
       headers: this.getHeaders(false),
       body: JSON.stringify({ username, password }),
     });
-    
+
     if (!res.ok) throw new Error('Login failed');
     return res.json();
   }
@@ -35,7 +35,7 @@ class ApiClient {
       headers: this.getHeaders(false),
       body: JSON.stringify({ username, email, password }),
     });
-    
+
     if (!res.ok) {
       const error = await res.json();
       throw new Error(error.message || 'Registration failed');
@@ -50,23 +50,70 @@ class ApiClient {
       page: page.toString(),
       size: size.toString(),
     });
-    
+
     if (category) params.append('category', category);
-    
+
     const res = await fetch(`${API_BASE}/user/media-items/search?${params}`, {
       headers: this.getHeaders(),
     });
-    
+
     if (!res.ok) throw new Error('Search failed');
     return res.json();
   }
+
+  // Media Items (Cursor-based)
+  async searchMediaItemsCursor(params: {
+    query: string;
+    category?: string;
+    genreIds?: number[];
+    platformIds?: number[];
+    cursorName?: string;
+    cursorId?: number;
+    limit?: number;
+  }): Promise<{
+    items: MediaItem[];
+    nextCursor?: { name: string; id: number };
+    hasMore: boolean;
+  }> {
+    const searchParams = new URLSearchParams({
+      query: params.query,
+      limit: String(params.limit ?? 20),
+    });
+
+    if (params.category) {
+      searchParams.append('category', params.category);
+    }
+
+    if (params.cursorName && params.cursorId !== undefined) {
+      searchParams.append('cursorName', params.cursorName);
+      searchParams.append('cursorId', String(params.cursorId));
+    }
+
+    params.genreIds?.forEach(id =>
+      searchParams.append('genreIds', String(id))
+    );
+
+    params.platformIds?.forEach(id =>
+      searchParams.append('platformIds', String(id))
+    );
+
+    const res = await fetch(
+      `${API_BASE}/user/media-items/search?${searchParams.toString()}`,
+      { headers: this.getHeaders() }
+    );
+
+    if (!res.ok) throw new Error('Search failed');
+
+    return res.json();
+  }
+
 
   // User Media List
   async getMyMediaList(page = 0, size = 100): Promise<UserMediaListItem[]> {
     const res = await fetch(`${API_BASE}/user/my-list?page=${page}&size=${size}`, {
       headers: this.getHeaders(),
     });
-    
+
     if (!res.ok) throw new Error('Failed to fetch list');
     return res.json();
   }
@@ -77,7 +124,7 @@ class ApiClient {
       headers: this.getHeaders(),
       body: JSON.stringify({ mediaItemId }),
     });
-    
+
     if (!res.ok) {
       const error = await res.json();
       throw new Error(error.message || 'Failed to add item');
@@ -91,7 +138,7 @@ class ApiClient {
       headers: this.getHeaders(),
       body: JSON.stringify(data),
     });
-    
+
     if (!res.ok) throw new Error('Failed to update item');
     return res.json();
   }
@@ -101,7 +148,7 @@ class ApiClient {
       method: 'DELETE',
       headers: this.getHeaders(),
     });
-    
+
     if (!res.ok) throw new Error('Failed to remove item');
   }
 
@@ -110,7 +157,7 @@ class ApiClient {
     const res = await fetch(`${API_BASE}/notifications?onlyUnread=${onlyUnread}`, {
       headers: this.getHeaders(),
     });
-    
+
     if (!res.ok) throw new Error('Failed to fetch notifications');
     return res.json();
   }
@@ -120,7 +167,7 @@ class ApiClient {
       method: 'PUT',
       headers: this.getHeaders(),
     });
-    
+
     if (!res.ok) throw new Error('Failed to mark as read');
     return res.json();
   }
@@ -130,7 +177,7 @@ class ApiClient {
       method: 'PUT',
       headers: this.getHeaders(),
     });
-    
+
     if (!res.ok) throw new Error('Failed to mark all as read');
   }
 
@@ -138,7 +185,7 @@ class ApiClient {
     const res = await fetch(`${API_BASE}/notifications/unread-count`, {
       headers: this.getHeaders(),
     });
-    
+
     if (!res.ok) throw new Error('Failed to get unread count');
     const data = await res.json();
     return data.unreadCount;
@@ -172,7 +219,7 @@ class ApiClient {
       method: 'DELETE',
       headers: this.getHeaders(),
     });
-    
+
     if (!res.ok) throw new Error('Failed to unfollow user');
   }
 
@@ -180,7 +227,7 @@ class ApiClient {
     const res = await fetch(`${API_BASE}/user/following`, {
       headers: this.getHeaders(),
     });
-    
+
     if (!res.ok) throw new Error('Failed to fetch following');
     return res.json();
   }
@@ -189,7 +236,7 @@ class ApiClient {
     const res = await fetch(`${API_BASE}/user/followers`, {
       headers: this.getHeaders(),
     });
-    
+
     if (!res.ok) throw new Error('Failed to fetch followers');
     return res.json();
   }
@@ -199,7 +246,7 @@ class ApiClient {
     const res = await fetch(`${API_BASE}/admin/genres`, {
       headers: this.getHeaders(),
     });
-    
+
     if (!res.ok) throw new Error('Failed to fetch genres');
     return res.json();
   }
@@ -208,7 +255,7 @@ class ApiClient {
     const res = await fetch(`${API_BASE}/admin/platforms`, {
       headers: this.getHeaders(),
     });
-    
+
     if (!res.ok) throw new Error('Failed to fetch platforms');
     return res.json();
   }
@@ -219,7 +266,7 @@ class ApiClient {
       headers: this.getHeaders(),
       body: JSON.stringify(data),
     });
-    
+
     if (!res.ok) throw new Error('Failed to create media item');
     return res.json();
   }
@@ -230,7 +277,7 @@ class ApiClient {
       headers: this.getHeaders(),
       body: JSON.stringify(data),
     });
-    
+
     if (!res.ok) throw new Error('Failed to update media item');
     return res.json();
   }
@@ -240,14 +287,14 @@ class ApiClient {
       method: 'DELETE',
       headers: this.getHeaders(),
     });
-    
+
     if (!res.ok) throw new Error('Failed to delete media item');
   }
 
   async uploadCSV(file: File): Promise<any> {
     const formData = new FormData();
     formData.append('file', file);
-    
+
     const token = localStorage.getItem('token');
     const res = await fetch(`${API_BASE}/admin/media-items/import-csv`, {
       method: 'POST',
@@ -256,7 +303,7 @@ class ApiClient {
       },
       body: formData,
     });
-    
+
     if (!res.ok) throw new Error('Failed to upload CSV');
     return res.json();
   }
@@ -265,7 +312,7 @@ class ApiClient {
     const res = await fetch(`${API_BASE}/admin/media-items/import-status/${jobId}`, {
       headers: this.getHeaders(),
     });
-    
+
     if (!res.ok) throw new Error('Failed to get job status');
     return res.json();
   }
@@ -276,7 +323,7 @@ class ApiClient {
       headers: this.getHeaders(),
       body: JSON.stringify(request),
     });
-    
+
     if (!res.ok) throw new Error('Failed to search users');
     return res.json();
   }
@@ -285,7 +332,7 @@ class ApiClient {
     const res = await fetch(`${API_BASE}/users/${userId}/profile`, {
       headers: this.getHeaders(),
     });
-    
+
     if (!res.ok) throw new Error('Failed to fetch user profile');
     return res.json();
   }
@@ -294,7 +341,7 @@ class ApiClient {
     const res = await fetch(`${API_BASE}/users/${userId}/list?page=${page}&size=${size}`, {
       headers: this.getHeaders(),
     });
-    
+
     if (!res.ok) throw new Error('Failed to fetch user list');
     return res.json();
   }
@@ -303,7 +350,7 @@ class ApiClient {
     const res = await fetch(`${API_BASE}/users/settings`, {
       headers: this.getHeaders(),
     });
-    
+
     if (!res.ok) throw new Error('Failed to fetch settings');
     return res.json();
   }
@@ -314,7 +361,7 @@ class ApiClient {
       headers: this.getHeaders(),
       body: JSON.stringify(settings),
     });
-    
+
     if (!res.ok) throw new Error('Failed to update settings');
     return res.json();
   }

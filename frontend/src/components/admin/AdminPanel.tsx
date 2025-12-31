@@ -399,38 +399,21 @@ export const AdminPanel: React.FC = () => {
               {/* Progress Bar */}
               <div className="space-y-2">
                 <div className="w-full bg-gray-700 rounded-full h-6 overflow-hidden">
-                  {uploadProgress.total > 0 ? (
-                    <div
-                      className={`h-6 rounded-full transition-all duration-500 ${
-                        uploadProgress.status === 'COMPLETED'
-                          ? 'bg-green-500'
-                          : uploadProgress.status === 'FAILED' || uploadProgress.status === 'STOPPED'
-                          ? 'bg-red-500'
-                          : 'bg-blue-600'
+                  <div
+                    className={`h-6 rounded-full transition-all duration-500 ${uploadProgress.status === 'COMPLETED'
+                        ? 'bg-green-500 w-full'
+                        : uploadProgress.status === 'FAILED' || uploadProgress.status === 'STOPPED'
+                          ? 'bg-red-500 w-full'
+                          : 'bg-blue-600 animate-pulse w-1/3'
                       }`}
-                      style={{
-                        width: `${Math.min(100, (uploadProgress.processed / uploadProgress.total) * 100)}%`
-                      }}
-                    />
-                  ) : (
-                    <div className="h-6 bg-blue-600 rounded-full animate-pulse" style={{ width: '10%' }} />
-                  )}
+                  />
                 </div>
                 <div className="flex justify-between text-sm text-gray-300">
                   <span>
-                    {uploadProgress.total > 0 ? (
-                      <>
-                        Processed: {uploadProgress.processed} / {uploadProgress.total} items
-                      </>
-                    ) : (
-                      'Reading CSV file...'
-                    )}
+                    {uploadProgress.readCount > 0
+                      ? `Processed ${uploadProgress.processed} items`
+                      : 'Reading CSV file...'}
                   </span>
-                  {uploadProgress.total > 0 && (
-                    <span className="font-medium">
-                      {Math.round((uploadProgress.processed / uploadProgress.total) * 100)}%
-                    </span>
-                  )}
                 </div>
               </div>
 
