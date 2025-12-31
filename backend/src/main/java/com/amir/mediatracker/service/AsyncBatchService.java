@@ -68,10 +68,20 @@ public class AsyncBatchService {
     }
     
     public void storeJobMapping(Long startTime, Long jobExecutionId) {
-        if (startTime != null && jobExecutionId != null) {
-            startTimeToJobId.put(startTime, jobExecutionId);
-            jobExecutions.put(jobExecutionId, null); // Placeholder, will be updated by JobExplorer
-            log.info("Stored mapping: startTime {} -> jobExecutionId {}", startTime, jobExecutionId);
+        if (startTime == null) {
+            log.warn("Attempted to store job mapping with null startTime");
+            return;
         }
+        if (jobExecutionId == null) {
+            log.warn("Attempted to store job mapping with null jobExecutionId for startTime: {}", startTime);
+            return;
+        }
+        
+        startTimeToJobId.put(startTime, jobExecutionId);
+        // Only put the execution if it's not already present to avoid overwriting a real execution with null
+        if (!jobExecutions.containsKey(jobExecutionId)) {
+            jobExecutions.put(jobExecutionId, null); // Placeholder, will be updated by JobExplorer
+        }
+        log.info("Stored mapping: startTime {} -> jobExecutionId {}", startTime, jobExecutionId);
     }
 }
