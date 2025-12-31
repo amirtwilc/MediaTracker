@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Check, X, Trash2 } from 'lucide-react';
+import { Search, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { MediaItem, Genre, Platform } from '../../types';
 import { api } from '../../services/api';
 import { getCategoryColor } from '../../utils/categoryColors';
@@ -10,6 +10,8 @@ export const UpdateMediaItem: React.FC = () => {
   const [searchResults, setSearchResults] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
 
   // Edit mode
   const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null);
@@ -57,6 +59,8 @@ export const UpdateMediaItem: React.FC = () => {
     try {
       const data = await api.searchMediaItems('', undefined, 0, 200);
       setSearchResults(data);
+      setTotalPages(Math.ceil(data.length / 20));
+      setCurrentPage(0);
       setHasSearched(true);
     } catch (error) {
       console.error('Failed to load items', error);
@@ -71,6 +75,8 @@ export const UpdateMediaItem: React.FC = () => {
     try {
       const data = await api.searchMediaItems(searchQuery, undefined, 0, 200);
       setSearchResults(data);
+      setTotalPages(Math.ceil(data.length / 20));
+      setCurrentPage(0);
     } catch (error) {
       console.error('Search failed', error);
     } finally {
@@ -126,6 +132,9 @@ export const UpdateMediaItem: React.FC = () => {
     setSelectedGenres([]);
     setSelectedPlatforms([]);
   };
+
+  // Pagination
+  const paginatedResults = searchResults.slice(currentPage * 20, (currentPage + 1) * 20);
 
   if (selectedItem) {
     return (
@@ -283,47 +292,74 @@ export const UpdateMediaItem: React.FC = () => {
       ) : searchResults.length === 0 && hasSearched ? (
         <div className="text-center py-8 text-gray-400">No items found.</div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-700 text-gray-300 text-sm">
-              <tr>
-                <th className="px-4 py-3 text-left">Category</th>
-                <th className="px-4 py-3 text-left">Name</th>
-                <th className="px-4 py-3 text-left">Year</th>
-                <th className="px-4 py-3 text-left">Genres</th>
-                <th className="px-4 py-3 text-left">Platforms</th>
-                <th className="px-4 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="text-sm">
-              {searchResults.map((item) => (
-                <tr key={item.id} className="border-b border-gray-700 hover:bg-gray-800">
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded text-xs ${getCategoryColor(item.category)} text-white`}>
-                      {item.category}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-white font-medium">{item.name}</td>
-                  <td className="px-4 py-3 text-gray-300">{item.year || '-'}</td>
-                  <td className="px-4 py-3 text-gray-300 text-sm">
-                    {item.genres.map(g => g.name).join(', ')}
-                  </td>
-                  <td className="px-4 py-3 text-gray-300 text-sm">
-                    {item.platforms.map(p => p.name).join(', ')}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => handleChooseItem(item)}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium"
-                    >
-                      Choose
-                    </button>
-                  </td>
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-700 text-gray-300 text-sm">
+                <tr>
+                  <th className="px-4 py-3 text-left">Category</th>
+                  <th className="px-4 py-3 text-left">Name</th>
+                  <th className="px-4 py-3 text-left">Year</th>
+                  <th className="px-4 py-3 text-left">Genres</th>
+                  <th className="px-4 py-3 text-left">Platforms</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="text-sm">
+                {paginatedResults.map((item) => (
+                  <tr key={item.id} className="border-b border-gray-700 hover:bg-gray-800">
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-1 rounded text-xs ${getCategoryColor(item.category)} text-white`}>
+                        {item.category}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-white font-medium">{item.name}</td>
+                    <td className="px-4 py-3 text-gray-300">{item.year || '-'}</td>
+                    <td className="px-4 py-3 text-gray-300 text-sm">
+                      {item.genres.map(g => g.name).join(', ')}
+                    </td>
+                    <td className="px-4 py-3 text-gray-300 text-sm">
+                      {item.platforms.map(p => p.name).join(', ')}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => handleChooseItem(item)}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium"
+                      >
+                        Choose
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-4 mt-4">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
+                disabled={currentPage === 0}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                <ChevronLeft size={20} />
+                Previous
+              </button>
+              <span className="text-gray-300">
+                Page {currentPage + 1} of {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(totalPages - 1, prev + 1))}
+                disabled={currentPage >= totalPages - 1}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                Next
+                <ChevronRight size={20} />
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
