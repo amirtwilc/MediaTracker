@@ -6,7 +6,9 @@ import com.amir.mediatracker.dto.request.MediaItemRequest;
 import com.amir.mediatracker.dto.request.PlatformRequest;
 import com.amir.mediatracker.dto.response.*;
 import com.amir.mediatracker.service.AdminService;
+import com.amir.mediatracker.service.AsyncBatchService;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.JobParameters;
@@ -23,21 +25,20 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 @RestController
 @RequestMapping("/media-tracker/admin")
 @PreAuthorize("hasRole('ADMIN')")
+@RequiredArgsConstructor
 public class AdminController {
 
-    @Autowired
-    private AdminService adminService;
-
-    @Autowired
-    private JobLauncher jobLauncher;
-
-    @Autowired
-    private Job importMediaItemJob;
+    private final AdminService adminService;
+    private final JobLauncher jobLauncher;
+    private final Job importMediaItemJob;
+    private final AsyncBatchService asyncBatchService;
 
     // Upload CSV and trigger Spring Batch job
     @LogAround
@@ -48,20 +49,35 @@ public class AdminController {
         // Save file temporarily
         String tempFilePath = saveTempFile(file);
 
-        // Launch batch job
+        // Launch batch job asynchronously
         JobParameters jobParameters = new JobParametersBuilder()
                 .addString("filePath", tempFilePath)
                 .addLong("startTime", System.currentTimeMillis())
                 .toJobParameters();
 
-        JobExecution execution = jobLauncher.run(importMediaItemJob, jobParameters);
+        // Start async execution
+        CompletableFuture<JobExecution> futureExecution =
+                asyncBatchService.runImportJob(jobParameters);
 
-        ImportStatusResponse response = new ImportStatusResponse();
-        response.setJobExecutionId(execution.getId());
-        response.setStatus(execution.getStatus().toString());
-        response.setStartTime(execution.getStartTime());
+        // Wait briefly to get the job ID (max 2 seconds)
+        try {
+            JobExecution execution = futureExecution.get(2, java.util.concurrent.TimeUnit.SECONDS);
 
-        return ResponseEntity.ok(response);
+            ImportStatusResponse response = new ImportStatusResponse();
+            response.setJobExecutionId(execution.getId());
+            response.setStatus(execution.getStatus().toString());
+            response.setStartTime(execution.getStartTime());
+
+            return ResponseEntity.ok(response);
+        } catch (java.util.concurrent.TimeoutException e) {
+            // Job hasn't started yet, return a temporary response
+            ImportStatusResponse response = new ImportStatusResponse();
+            response.setJobExecutionId(jobParameters.getLong("startTime"));
+            response.setStatus("STARTING");
+            response.setStartTime(LocalDateTime.now());
+
+            return ResponseEntity.ok(response);
+        }
     }
 
     // Check batch job status

@@ -118,7 +118,7 @@ public class UserController {
 
     // Update follow threshold
     @LogAround
-    @PutMapping("/follow/{userId}/threshold")
+    @PutMapping("/follow/{followUserId}/threshold")
     public ResponseEntity<UserFollowResponse> updateFollowThreshold(
             @PathVariable Long followUserId,
             @RequestBody @Valid UpdateThresholdRequest request,

@@ -27,7 +27,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.lang.management.GarbageCollectorMXBean;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
@@ -47,6 +46,8 @@ public class AdminService {
     private final PlatformRepository platformRepository;
 
     private final JobExplorer jobExplorer;
+    
+    private final AsyncBatchService asyncBatchService;
 
     public List<GenreResponse> getAllGenres() {
         return genreRepository.findAll().stream()
@@ -170,16 +171,33 @@ public class AdminService {
     }
 
     public JobStatusResponse getJobStatus(Long jobExecutionId) {
-        JobExecution jobExecution = jobExplorer.getJobExecution(jobExecutionId);
+        JobExecution jobExecution = null;
+        
+        // If the ID looks like a timestamp (large number), try to find the actual job execution ID
+        if (jobExecutionId > 1000000000000L) {
+            // This is likely a timestamp (startTime), get the actual job execution ID
+            Long actualJobExecutionId = asyncBatchService.getJobExecutionIdByStartTime(jobExecutionId);
+            if (actualJobExecutionId != null) {
+                jobExecutionId = actualJobExecutionId;
+                log.debug("Resolved startTime {} to job execution ID {}", jobExecutionId, actualJobExecutionId);
+            }
+        }
+        
+        // Always query JobExplorer for the latest status (not in-memory cache)
+        // This ensures we get real-time updates as the job progresses
+        jobExecution = jobExplorer.getJobExecution(jobExecutionId);
 
         if (jobExecution == null) {
             throw new ResourceNotFoundException("Job execution not found");
         }
 
+        // Get fresh step executions from JobExplorer to ensure we have the latest counts
+        // Step executions are updated in real-time as the job processes items
         long readCount = 0;
         long writeCount = 0;
         long skipCount = 0;
 
+        // Get step executions - these are updated in real-time as the job runs
         for (StepExecution stepExecution : jobExecution.getStepExecutions()) {
             readCount += stepExecution.getReadCount();
             writeCount += stepExecution.getWriteCount();

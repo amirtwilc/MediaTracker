@@ -151,8 +151,19 @@ class ApiClient {
       headers: this.getHeaders(),
       body: JSON.stringify({ userId, minimumRatingThreshold: threshold }),
     });
-    
+
     if (!res.ok) throw new Error('Failed to follow user');
+    return res.json();
+  }
+
+  async updateFollowThreshold(userId: number, threshold: number): Promise<UserFollow> {
+    const res = await fetch(`${API_BASE}/user/follow/${userId}/threshold`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ threshold }),
+    });
+
+    if (!res.ok) throw new Error('Failed to update threshold');
     return res.json();
   }
 

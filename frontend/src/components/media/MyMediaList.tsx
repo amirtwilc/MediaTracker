@@ -1,18 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { Edit2, Trash2, X, Filter, ChevronDown, ChevronUp } from 'lucide-react';
+import { Edit2, Trash2, X, Filter, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import { UserMediaListItem } from '../../types';
 import { api } from '../../services/api';
 import { ConfirmModal } from '../common/ConfirmModal';
 import { TruncatedList } from '../common/TruncatedList';
 import { StarRating } from '../common/StarRating';
+import { getCategoryColor } from '../../utils/categoryColors';
 
 export const MyMediaList: React.FC = () => {
   const [items, setItems] = useState<UserMediaListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   
   // Edit mode state
   const [editState, setEditState] = useState<Partial<UserMediaListItem>>({});
+  const [currentPage, setCurrentPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [allItems, setAllItems] = useState<UserMediaListItem[]>([]);
   
   // Filters
   const [showFilters, setShowFilters] = useState(false);
@@ -54,8 +59,11 @@ export const MyMediaList: React.FC = () => {
 
   const loadList = async () => {
     try {
-      const data = await api.getMyMediaList();
-      setItems(data);
+      const data = await api.getMyMediaList(0, 1000); // Load all items
+      setAllItems(data);
+      setItems(data.slice(0, 20)); // Show first 20
+      setCurrentPage(0);
+      setTotalPages(Math.ceil(data.length / 20));
     } catch (error) {
       console.error('Failed to load list', error);
     } finally {
@@ -144,8 +152,11 @@ export const MyMediaList: React.FC = () => {
   const hasActiveFilters = filterCategories.length > 0 || filterGenres.length > 0 || 
                           filterPlatforms.length > 0 || wishToExperienceFilter;
 
-  const filteredItems = items
+  const filteredItems = allItems
     .filter(item => {
+      if (searchQuery && !item.mediaItem.name.toLowerCase().includes(searchQuery.toLowerCase())) {
+        return false;
+      }
       if (filterCategories.length > 0 && !filterCategories.includes(item.mediaItem.category)) {
         return false;
       }
@@ -198,12 +209,33 @@ export const MyMediaList: React.FC = () => {
       return 0;
     });
 
+  const paginatedItems = filteredItems.slice(currentPage * 20, (currentPage + 1) * 20);
+  const filteredTotalPages = Math.ceil(filteredItems.length / 20);
   if (loading) {
     return <div className="text-center py-8 text-gray-400">Loading your list...</div>;
   }
 
   return (
     <div className="space-y-4">
+      {/* Search Bar */}
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search in your list by name..."
+          className="flex-1 px-4 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
+        />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery('')}
+            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded flex items-center gap-2"
+            title="Clear search"
+          >
+            <X size={20} />
+          </button>
+        )}
+      </div>
       {/* Filter Toggle Button */}
       <div className="flex items-center gap-4">
         <button
@@ -378,24 +410,24 @@ export const MyMediaList: React.FC = () => {
               </tr>
             </thead>
             <tbody className="text-sm">
-              {filteredItems.map((item) => {
+              {paginatedItems.map((item) => {
                 const isEditing = editingId === item.id;
                 const currentExperienced = isEditing ? editState.experienced : item.experienced;
                 
                 return (
                   <tr key={item.id} className="border-b border-gray-700 hover:bg-gray-800">
                     <td className="px-4 py-3">
-                      <span className="px-2 py-1 rounded text-xs bg-gray-700 text-gray-200">
+                      <span className={`px-2 py-1 rounded text-xs ${getCategoryColor(item.mediaItem.category)} text-white`}>
                         {item.mediaItem.category}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-white font-medium">{item.mediaItem.name}</td>
                     <td className="px-4 py-3 text-gray-300">{item.mediaItem.year || '-'}</td>
-                    <td className="px-4 py-3">
-                      <TruncatedList items={item.mediaItem.genres.map(g => g.name)} />
+                    <td className="px-4 py-3 text-gray-200 text-sm">
+                      {item.mediaItem.genres.map(g => g.name).join(', ')}
                     </td>
-                    <td className="px-4 py-3">
-                      <TruncatedList items={item.mediaItem.platforms.map(p => p.name)} />
+                    <td className="px-4 py-3 text-gray-200 text-sm">
+                      {item.mediaItem.platforms.map(p => p.name).join(', ')}
                     </td>
                     <td className="px-4 py-3 text-center">
                       {isEditing ? (
@@ -503,6 +535,35 @@ export const MyMediaList: React.FC = () => {
         </div>
       )}
 
+      {filteredTotalPages > 1 && (
+        <div className="flex items-center justify-center gap-4 mt-4">
+          <button
+            onClick={() => {
+              setCurrentPage(prev => prev - 1);
+              setItems(filteredItems.slice((currentPage - 1) * 20, currentPage * 20));
+            }}
+            disabled={currentPage === 0}
+            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            <ChevronLeft size={20} />
+            Previous
+          </button>
+          <span className="text-gray-300">
+            Page {currentPage + 1} of {filteredTotalPages}
+          </span>
+          <button
+            onClick={() => {
+              setCurrentPage(prev => prev + 1);
+              setItems(filteredItems.slice((currentPage + 1) * 20, (currentPage + 2) * 20));
+            }}
+            disabled={currentPage >= filteredTotalPages - 1}
+            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            Next
+            <ChevronRight size={20} />
+          </button>
+        </div>
+      )}
       <ConfirmModal
         isOpen={deleteConfirm.show}
         title="Remove Item"

@@ -10,11 +10,13 @@ import { NotificationsPanel } from './components/notifications/NotificationsPane
 import { api } from './services/api';
 import { UserSearch } from './components/users/UserSearch';
 import { UserProfile } from './components/users/UserProfile';
+import { AdvancedUserSearch } from './components/users/AdvancedUserSearch';
 import { Settings } from './components/settings/Settings';
 
 const App: React.FC = () => {
   const { user, logout, isAdmin } = useAuth();
   const [activeView, setActiveView] = useState<'myList' | 'search' | 'follow' | 'admin' | 'users' | 'settings'>('myList');
+  const [usersSubView, setUsersSubView] = useState<'search' | 'advanced'>('search');
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [previousView, setPreviousView] = useState<'myList' | 'search' | 'follow' | 'admin' | 'users' | 'settings'>('users');
   const [showNotifications, setShowNotifications] = useState(false);
@@ -178,7 +180,38 @@ const App: React.FC = () => {
         {activeView === 'search' && <SearchMedia />}
         {activeView === 'follow' && <FollowManagement onViewUser={handleViewUser} />}
         {activeView === 'admin' && isAdmin && <AdminPanel />}
-        {activeView === 'users' && !selectedUserId && <UserSearch onViewUser={handleViewUser} />}
+        {activeView === 'users' && !selectedUserId && (
+          <div className="space-y-6">
+            <div className="flex gap-2 border-b border-gray-700">
+              <button
+                onClick={() => setUsersSubView('search')}
+                className={`px-4 py-2 font-medium ${
+                  usersSubView === 'search'
+                    ? 'text-white border-b-2 border-blue-500'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                User Search
+              </button>
+              <button
+                onClick={() => setUsersSubView('advanced')}
+                className={`px-4 py-2 font-medium ${
+                  usersSubView === 'advanced'
+                    ? 'text-white border-b-2 border-blue-500'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                Advanced Search
+              </button>
+            </div>
+            
+            {usersSubView === 'search' ? (
+              <UserSearch onViewUser={handleViewUser} />
+            ) : (
+              <AdvancedUserSearch onViewUser={handleViewUser} />
+            )}
+          </div>
+        )}
         {activeView === 'users' && selectedUserId && (
           <UserProfile
             key={selectedUserId}

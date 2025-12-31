@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, Filter, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, UserPlus, Check, X } from 'lucide-react';
 import { UserProfile } from '../../types';
 import { api } from '../../services/api';
+import { ThresholdModal } from '../common/ThresholdModal';
 
 interface UserSearchProps {
   onViewUser: (userId: number) => void;
@@ -18,6 +19,12 @@ export const UserSearch: React.FC<UserSearchProps> = ({ onViewUser }) => {
   const [showFilters, setShowFilters] = useState(false);
   const [adminOnly, setAdminOnly] = useState<boolean | undefined>(undefined);
   const [sortConfig, setSortConfig] = useState({ by: 'lastActive', direction: 'desc' });
+
+  const [followModal, setFollowModal] = useState<{ show: boolean; userId: number; username: string }>({
+    show: false,
+    userId: 0,
+    username: '',
+  });
 
   // Following state
   const [followingUsers, setFollowingUsers] = useState<Set<number>>(new Set());
@@ -73,11 +80,16 @@ export const UserSearch: React.FC<UserSearchProps> = ({ onViewUser }) => {
     loadUsers(0);
   };
 
-  const handleFollow = async (userId: number) => {
+  const handleFollowClick = (userId: number, username: string) => {
+    setFollowModal({ show: true, userId, username });
+  };
+
+  const handleFollowConfirm = async (threshold: number | null) => {
     try {
-      await api.followUser(userId, 7);
-      setFollowingUsers(new Set(followingUsers).add(userId));
+      await api.followUser(followModal.userId, threshold === null ? 0 : threshold);
+      setFollowingUsers(new Set(followingUsers).add(followModal.userId));
       loadUsers(currentPage);
+      setFollowModal({ show: false, userId: 0, username: '' });
     } catch (error) {
       console.error('Failed to follow user', error);
     }
@@ -328,13 +340,13 @@ export const UserSearch: React.FC<UserSearchProps> = ({ onViewUser }) => {
                             Following
                           </button>
                         ) : (
-                          <button
-                            onClick={() => handleFollow(user.id)}
-                            className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs flex items-center gap-1"
-                          >
-                            <UserPlus size={14} />
-                            Follow
-                          </button>
+                            <button
+                              onClick={() => handleFollowClick(user.id, user.username)}
+                              className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs flex items-center gap-1"
+                            >
+                              <UserPlus size={14} />
+                              Follow
+                            </button>
                         )}
                       </div>
                     </td>
@@ -368,6 +380,12 @@ export const UserSearch: React.FC<UserSearchProps> = ({ onViewUser }) => {
           )}
         </>
       )}
+      <ThresholdModal
+        isOpen={followModal.show}
+        username={followModal.username}
+        onConfirm={handleFollowConfirm}
+        onCancel={() => setFollowModal({ show: false, userId: 0, username: '' })}
+      />
     </div>
   );
 };

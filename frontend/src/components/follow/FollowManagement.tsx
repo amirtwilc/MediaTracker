@@ -99,7 +99,10 @@ export const FollowManagement: React.FC<FollowManagementProps> = ({ onViewUser }
                 <div>
                   <p className="text-white font-medium">{follow.user.username}</p>
                   <p className="text-sm text-gray-400">
-                    Notify when rating ≥ {follow.minimumRatingThreshold}
+                    {follow.minimumRatingThreshold === 0
+                      ? 'No rating notification specified'
+                      : `Notify when rating ≥ ${follow.minimumRatingThreshold}`
+                    }
                   </p>
                 </div>
                 <button

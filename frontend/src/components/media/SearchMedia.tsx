@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Search, Plus, Check, Filter, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { MediaItem, UserMediaListItem } from '../../types';
 import { api } from '../../services/api';
-import { TruncatedList } from '../common/TruncatedList';
 import { StarRating } from '../common/StarRating';
+import { getCategoryColor } from '../../utils/categoryColors';
 
 export const SearchMedia: React.FC = () => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<MediaItem[]>([]);
+  const [allResults, setAllResults] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
@@ -38,12 +39,14 @@ export const SearchMedia: React.FC = () => {
   useEffect(() => {
     loadLatestItems();
     loadGenresAndPlatforms();
+    loadUserList();
   }, []);
 
   useEffect(() => {
     if (query || filterCategories.length > 0 || filterGenres.length > 0 || filterPlatforms.length > 0) {
-      handleSearch(0);
-    } else if (!hasSearched) {
+      applyFiltersAndSearch();
+    } else if (hasSearched) {
+      // When all filters are cleared, reload latest items
       loadLatestItems();
     }
   }, [filterCategories, filterGenres, filterPlatforms]);
@@ -58,16 +61,25 @@ export const SearchMedia: React.FC = () => {
     }
   }, [errorMessage]);
 
+  const loadUserList = async () => {
+    try {
+      const list = await api.getMyMediaList(0, 1000);
+      const itemMap = new Map(list.map(item => [item.mediaItem.id, item.id]));
+      setUserListItemIds(itemMap);
+    } catch (error) {
+      console.error('Failed to load user list', error);
+    }
+  };
+
   const loadLatestItems = async () => {
     setLoading(true);
     try {
-      // Search with empty query to get latest items
-      const data = await api.searchMediaItems('', undefined, 0, 20);
-      // Sort by year descending (latest first)
+      const data = await api.searchMediaItems('', undefined, 0, 200);
       const sorted = data.sort((a, b) => (b.year || 0) - (a.year || 0));
-      setResults(sorted);
+      setAllResults(sorted);
+      setResults(sorted.slice(0, 20));
       setCurrentPage(0);
-      setTotalPages(1);
+      setTotalPages(Math.ceil(sorted.length / 20));
       setHasSearched(false);
     } catch (error) {
       console.error('Failed to load items', error);
@@ -89,56 +101,82 @@ export const SearchMedia: React.FC = () => {
     }
   };
 
-  const handleSearch = async (page: number = 0) => {
+  const applyFiltersAndSearch = async () => {
     setLoading(true);
-    setCurrentPage(page);
     setHasSearched(true);
-    
+    setCurrentPage(0);
+
     try {
-      const categoryFilter = filterCategories.length === 1 ? filterCategories[0] : undefined;
-      const data = await api.searchMediaItems(query || '', categoryFilter, page, 20);
-      
+      // Fetch data based on query and category filter
+      const data = await api.searchMediaItems(query || '', undefined, 0, 200);
+
       let filtered = data;
 
-      // Client-side filtering for genres and platforms
+      // Apply category filter
+      if (filterCategories.length > 0) {
+        filtered = filtered.filter(item =>
+          filterCategories.includes(item.category)
+        );
+      }
+
+      // Apply genre filter
       if (filterGenres.length > 0) {
         filtered = filtered.filter(item =>
           item.genres.some(g => filterGenres.includes(g.name))
         );
       }
 
+      // Apply platform filter
       if (filterPlatforms.length > 0) {
         filtered = filtered.filter(item =>
           item.platforms.some(p => filterPlatforms.includes(p.name))
         );
       }
 
-      // Apply sorting if any
+      // Apply sorting
       const sorted = applySorting(filtered);
       
-      setResults(sorted);
-      setTotalPages(Math.ceil(sorted.length / 20));
+      setAllResults(sorted);
+      setResults(sorted.slice(0, 20));
+      setTotalPages(Math.max(1, Math.ceil(sorted.length / 20)));
     } catch (error) {
       console.error('Search failed', error);
+      setAllResults([]);
+      setResults([]);
+      setTotalPages(0);
     } finally {
       setLoading(false);
     }
   };
 
+  const handleSearch = () => {
+    applyFiltersAndSearch();
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    const startIdx = page * 20;
+    const endIdx = startIdx + 20;
+    setResults(allResults.slice(startIdx, endIdx));
+  };
+
   const handleClearSearch = () => {
     setQuery('');
-    setHasSearched(false);
+    setFilterCategories([]);
+    setFilterGenres([]);
+    setFilterPlatforms([]);
     setSortConfig([]);
+    setHasSearched(false);
     loadLatestItems();
   };
 
-  const applySorting = (items: MediaItem[]) => {
-    if (sortConfig.length === 0) return items;
+  const applySorting = (items: MediaItem[], config: Array<{ key: string; direction: 'asc' | 'desc' }> = sortConfig) => {
+    if (config.length === 0) return items;
 
     return [...items].sort((a, b) => {
-      for (const sort of sortConfig) {
+      for (const sort of config) {
         let comparison = 0;
-        
+
         switch (sort.key) {
           case 'name':
             comparison = a.name.localeCompare(b.name);
@@ -149,36 +187,45 @@ export const SearchMedia: React.FC = () => {
           case 'category':
             comparison = a.category.localeCompare(b.category);
             break;
-          case 'avgRating':  
+          case 'avgRating':
             comparison = (a.avgRating || 0) - (b.avgRating || 0);
             break;
         }
-        
+
         if (comparison !== 0) {
           return sort.direction === 'asc' ? comparison : -comparison;
         }
       }
-      
+
       return 0;
     });
   };
 
   const handleSort = (key: string) => {
-    setSortConfig(current => {
-      const existing = current.find(s => s.key === key);
+    setSortConfig(prev => {
+      const existing = prev.find(s => s.key === key);
+      let newConfig;
       if (existing) {
         if (existing.direction === 'asc') {
-          return current.map(s => s.key === key ? { ...s, direction: 'desc' as 'desc' } : s);
+          newConfig = prev.map(s => s.key === key ? { ...s, direction: 'desc' as 'desc' } : s);
         } else {
-          return current.filter(s => s.key !== key);
+          newConfig = prev.filter(s => s.key !== key);
         }
       } else {
-        return [...current, { key, direction: 'asc' as 'asc' }];
+        newConfig = [...prev, { key, direction: 'asc' as 'asc' }];
       }
+      
+      // Apply sorting immediately to all results
+      const sorted = applySorting(allResults, newConfig);
+      setAllResults(sorted);
+      
+      // Update current page results
+      const startIdx = currentPage * 20;
+      const endIdx = startIdx + 20;
+      setResults(sorted.slice(startIdx, endIdx));
+      
+      return newConfig;
     });
-
-    // Reapply sorting
-    setResults(applySorting(results));
   };
 
   const getSortIcon = (key: string) => {
@@ -214,9 +261,8 @@ export const SearchMedia: React.FC = () => {
         rating: undefined,
         comment: '',
       });
-      setErrorMessage(''); // Clear any previous errors
+      setErrorMessage('');
     } catch (error: any) {
-      // Show error notification instead of alert
       setErrorMessage(error.message || 'Failed to add item');
     }
   };
@@ -232,11 +278,6 @@ export const SearchMedia: React.FC = () => {
     } catch (error) {
       console.error('Failed to update item', error);
     }
-  };
-
-  const handleCancelUpdate = () => {
-    setEditingAddedId(null);
-    setEditState({});
   };
 
   const hasActiveFilters = filterCategories.length > 0 || filterGenres.length > 0 || filterPlatforms.length > 0;
@@ -262,18 +303,18 @@ export const SearchMedia: React.FC = () => {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && handleSearch(0)}
+          onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
           placeholder="Search for movies, series, or games..."
           className="flex-1 px-4 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
         />
         <button
-          onClick={() => handleSearch(0)}
+          onClick={handleSearch}
           disabled={loading}
           className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium disabled:opacity-50"
         >
           <Search size={20} />
         </button>
-        {hasSearched && query && (
+        {(hasSearched || query) && (
           <button
             onClick={handleClearSearch}
             className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded flex items-center gap-2"
@@ -324,9 +365,9 @@ export const SearchMedia: React.FC = () => {
             </div>
           </div>
 
-          {allGenres.length > 0 && (
-            <div>
-              <label className="block text-sm text-gray-300 mb-2">Genres:</label>
+          <div>
+            <label className="block text-sm text-gray-300 mb-2">Genres:</label>
+            {allGenres.length > 0 ? (
               <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
                 {allGenres.map(genre => (
                   <button
@@ -342,12 +383,14 @@ export const SearchMedia: React.FC = () => {
                   </button>
                 ))}
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="text-sm text-gray-400">Loading genres...</div>
+            )}
+          </div>
 
-          {allPlatforms.length > 0 && (
-            <div>
-              <label className="block text-sm text-gray-300 mb-2">Platforms:</label>
+          <div>
+            <label className="block text-sm text-gray-300 mb-2">Platforms:</label>
+            {allPlatforms.length > 0 ? (
               <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
                 {allPlatforms.map(platform => (
                   <button
@@ -363,8 +406,10 @@ export const SearchMedia: React.FC = () => {
                   </button>
                 ))}
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="text-sm text-gray-400">Loading platforms...</div>
+            )}
+          </div>
 
           {hasActiveFilters && (
             <button
@@ -392,7 +437,12 @@ export const SearchMedia: React.FC = () => {
             </span>
           ))}
           <button
-            onClick={() => setSortConfig([])}
+            onClick={() => {
+              setSortConfig([]);
+              const startIdx = currentPage * 20;
+              const endIdx = startIdx + 20;
+              setResults(allResults.slice(startIdx, endIdx));
+            }}
             className="ml-4 text-sm text-red-400 hover:text-red-300"
           >
             Clear sorts
@@ -454,7 +504,7 @@ export const SearchMedia: React.FC = () => {
                   return (
                     <tr key={item.id} className="border-b border-gray-700 hover:bg-gray-800">
                       <td className="px-4 py-3">
-                        <span className="px-2 py-1 rounded text-xs bg-gray-700 text-gray-200">
+                        <span className={`px-2 py-1 rounded text-xs ${getCategoryColor(item.category)} text-white`}>
                           {item.category}
                         </span>
                       </td>
@@ -469,11 +519,11 @@ export const SearchMedia: React.FC = () => {
                           '-'
                         )}
                       </td>
-                      <td className="px-4 py-3">
-                        <TruncatedList items={item.genres.map(g => g.name)} />
+                      <td className="px-4 py-3 text-gray-200 text-sm">
+                        {item.genres.map(g => g.name).join(', ')}
                       </td>
-                      <td className="px-4 py-3">
-                        <TruncatedList items={item.platforms.map(p => p.name)} />
+                      <td className="px-4 py-3 text-gray-200 text-sm">
+                        {item.platforms.map(p => p.name).join(', ')}
                       </td>
                       <td className="px-4 py-3 text-center">
                         {isEditing ? (
@@ -543,16 +593,10 @@ export const SearchMedia: React.FC = () => {
                               onClick={() => handleSaveUpdate(item.id)}
                               className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs"
                             >
-                              Save
-                            </button>
-                            <button
-                              onClick={handleCancelUpdate}
-                              className="px-2 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded text-xs"
-                            >
-                              Cancel
+                              Update
                             </button>
                           </div>
-                        ) : isAdded ? (
+                        ) : isAdded || userListItemIds.has(item.id) ? (
                           <div className="flex items-center justify-end gap-2 text-green-400">
                             <Check size={16} />
                             <span className="text-xs">Added</span>
@@ -578,7 +622,7 @@ export const SearchMedia: React.FC = () => {
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-4">
               <button
-                onClick={() => handleSearch(currentPage - 1)}
+                onClick={() => handlePageChange(currentPage - 1)}
                 disabled={currentPage === 0}
                 className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -588,7 +632,7 @@ export const SearchMedia: React.FC = () => {
                 Page {currentPage + 1} of {totalPages}
               </span>
               <button
-                onClick={() => handleSearch(currentPage + 1)}
+                onClick={() => handlePageChange(currentPage + 1)}
                 disabled={currentPage >= totalPages - 1}
                 className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
               >
