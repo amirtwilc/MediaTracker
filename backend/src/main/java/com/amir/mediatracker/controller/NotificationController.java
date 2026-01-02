@@ -57,7 +57,6 @@ public class NotificationController {
 
     // Get unread count
     @GetMapping("/unread-count")
-    @LogAround
     public ResponseEntity<Map<String, Long>> getUnreadCount(
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
         Long userId = userPrincipal.getId();

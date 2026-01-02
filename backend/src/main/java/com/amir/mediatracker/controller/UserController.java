@@ -40,17 +40,23 @@ public class UserController {
     @GetMapping("/media-items/search")
     public ResponseEntity<MediaSearchResponse> searchMediaItems(
             @RequestParam String query,
-            @RequestParam(required = false) Category category,
+            @RequestParam(required = false) Set<Category> categories,
             @RequestParam(required = false) Set<Long> genreIds,
             @RequestParam(required = false) Set<Long> platformIds,
             @RequestParam(required = false) String cursorName,
             @RequestParam(required = false) Long cursorId,
             @RequestParam(defaultValue = "20") int limit
     ) {
+        // For now, if multiple categories are provided, we'll need to handle this differently
+        // Let's pass null category if more than one is selected, and filter client-side
+        Category singleCategory = (categories != null && categories.size() == 1)
+                ? categories.iterator().next()
+                : null;
+
         return ResponseEntity.ok(
                 mediaItemService.searchMediaItemsCursor(
                         query,
-                        category,
+                        singleCategory,
                         genreIds,
                         platformIds,
                         cursorName,
@@ -69,6 +75,34 @@ public class UserController {
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
         Long userId = userPrincipal.getId();
         return ResponseEntity.ok(userMediaListService.getUserMediaList(userId, page, size));
+    }
+
+    @LogAround
+    @GetMapping("/my-list/cursor")
+    public ResponseEntity<UserMediaListSearchResponse> getMyMediaListCursor(
+            @RequestParam(required = false) String searchQuery,
+            @RequestParam(required = false) Category category,
+            @RequestParam(required = false) Set<Long> genreIds,
+            @RequestParam(required = false) Set<Long> platformIds,
+            @RequestParam(required = false) Boolean wishToExperience,
+            @RequestParam(required = false) String cursorName,
+            @RequestParam(required = false) Long cursorId,
+            @RequestParam(defaultValue = "20") int limit,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        Long userId = userPrincipal.getId();
+        return ResponseEntity.ok(
+                userMediaListService.getUserMediaListCursor(
+                        userId,
+                        searchQuery,
+                        category,
+                        genreIds,
+                        platformIds,
+                        wishToExperience,
+                        cursorName,
+                        cursorId,
+                        limit
+                )
+        );
     }
 
     // Add media to user's list

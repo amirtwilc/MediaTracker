@@ -1,10 +1,8 @@
 package com.amir.mediatracker.service;
 
+import com.amir.mediatracker.dto.Category;
 import com.amir.mediatracker.dto.request.UpdateMediaListRequest;
-import com.amir.mediatracker.dto.response.GenreResponse;
-import com.amir.mediatracker.dto.response.MediaItemResponse;
-import com.amir.mediatracker.dto.response.PlatformResponse;
-import com.amir.mediatracker.dto.response.UserMediaListResponse;
+import com.amir.mediatracker.dto.response.*;
 import com.amir.mediatracker.entity.MediaItem;
 import com.amir.mediatracker.entity.User;
 import com.amir.mediatracker.entity.UserMediaList;
@@ -26,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -55,6 +54,83 @@ public class UserMediaListService {
         return list.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
+    }
+
+    public UserMediaListSearchResponse getUserMediaListCursor(
+            Long userId,
+            String searchQuery,
+            Category category,
+            Set<Long> genreIds,
+            Set<Long> platformIds,
+            Boolean wishToExperience,
+            String cursorName,
+            Long cursorId,
+            int limit
+    ) {
+        Pageable pageable = PageRequest.of(0, limit + 1);
+
+        Set<Long> safeGenres = genreIds == null ? Set.of() : genreIds;
+        Set<Long> safePlatforms = platformIds == null ? Set.of() : platformIds;
+        boolean safeWishToExperience = wishToExperience != null && wishToExperience;
+        String safeSearchQuery = searchQuery == null ? "" : searchQuery;
+        String safeCursorName = cursorName == null ? "" : cursorName;
+        Long safeCursorId = cursorId == null ? 0L : cursorId;
+
+        // Get total count with filters using simpler query
+        long totalCount;
+        try {
+            totalCount = userMediaListRepository.countByUserIdWithFiltersSimple(
+                    userId,
+                    safeSearchQuery,
+                    category,
+                    safeGenres.isEmpty() ? null : safeGenres,
+                    safePlatforms.isEmpty() ? null : safePlatforms,
+                    safeWishToExperience
+            );
+        } catch (Exception e) {
+            log.error("Failed to count with filters", e);
+            totalCount = userMediaListRepository.countByUserId(userId);
+        }
+
+        // Fetch items with cursor and filters
+        List<UserMediaList> items = userMediaListRepository.findByUserIdWithFilters(
+                userId,
+                safeSearchQuery,
+                category,
+                safeGenres.isEmpty() ? null : safeGenres,
+                safePlatforms.isEmpty() ? null : safePlatforms,
+                safeGenres.size(),
+                safePlatforms.size(),
+                safeWishToExperience,
+                safeCursorName,
+                safeCursorId,
+                pageable
+        );
+
+        boolean hasMore = items.size() > limit;
+        if (hasMore) {
+            items = items.subList(0, limit);
+        }
+
+        List<UserMediaListResponse> responses = items.stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+
+        UserMediaListSearchResponse.Cursor nextCursor = null;
+        if (hasMore && !items.isEmpty()) {
+            UserMediaList last = items.get(items.size() - 1);
+            nextCursor = new UserMediaListSearchResponse.Cursor(
+                    last.getMediaItem().getName(),
+                    last.getId()
+            );
+        }
+
+        return UserMediaListSearchResponse.builder()
+                .items(responses)
+                .nextCursor(nextCursor)
+                .hasMore(hasMore)
+                .totalCount(totalCount)
+                .build();
     }
 
     @Transactional

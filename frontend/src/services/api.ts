@@ -74,6 +74,7 @@ class ApiClient {
     items: MediaItem[];
     nextCursor?: { name: string; id: number };
     hasMore: boolean;
+    totalCount: number;
   }> {
     const searchParams = new URLSearchParams({
       query: params.query,
@@ -116,6 +117,66 @@ class ApiClient {
 
     if (!res.ok) throw new Error('Failed to fetch list');
     return res.json();
+  }
+
+  async getMyMediaListCursor(params: {
+    searchQuery: string;
+    category?: string;
+    genreIds?: number[];
+    platformIds?: number[];
+    wishToExperience?: boolean;
+    cursorName?: string;
+    cursorId?: number;
+    limit?: number;
+  }): Promise<{
+    items: UserMediaListItem[];
+    nextCursor?: { name: string; id: number };
+    hasMore: boolean;
+    totalCount: number;
+  }> {
+    const searchParams = new URLSearchParams({
+      limit: String(params.limit ?? 20),
+    });
+
+    if (params.searchQuery) {
+      searchParams.append('searchQuery', params.searchQuery);
+    }
+
+    if (params.category) {
+      searchParams.append('category', params.category);
+    }
+
+    if (params.wishToExperience !== undefined) {
+      searchParams.append('wishToExperience', String(params.wishToExperience));
+    }
+
+    if (params.cursorName && params.cursorId !== undefined) {
+      searchParams.append('cursorName', params.cursorName);
+      searchParams.append('cursorId', String(params.cursorId));
+    }
+
+    params.genreIds?.forEach(id =>
+      searchParams.append('genreIds', String(id))
+    );
+
+    params.platformIds?.forEach(id =>
+      searchParams.append('platformIds', String(id))
+    );
+
+    const res = await fetch(
+      `${API_BASE}/user/my-list/cursor?${searchParams.toString()}`,
+      { headers: this.getHeaders() }
+    );
+
+    if (!res.ok) throw new Error('Failed to fetch list');
+
+    const data = await res.json();
+    return {
+      items: data.items,
+      nextCursor: data.nextCursor,
+      hasMore: data.hasMore,
+      totalCount: data.totalCount,
+    };
   }
 
   async addToMyList(mediaItemId: number): Promise<UserMediaListItem> {

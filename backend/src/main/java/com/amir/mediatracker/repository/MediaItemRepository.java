@@ -75,4 +75,30 @@ public interface MediaItemRepository extends JpaRepository<MediaItem, Long> {
             Pageable pageable
     );
 
+    @Query("""
+            SELECT COUNT(DISTINCT m.id) FROM MediaItem m
+            LEFT JOIN m.genres g
+            LEFT JOIN m.platforms p
+            WHERE LOWER(m.name) LIKE LOWER(CONCAT('%', :name, '%'))
+            AND (:category IS NULL OR m.category = :category)
+            AND (:genreIds IS NULL OR g.id IN :genreIds)
+            AND (:platformIds IS NULL OR p.id IN :platformIds)
+            """)
+    Long countWithFiltersSimple(
+            @Param("name") String name,
+            @Param("category") Category category,
+            @Param("genreIds") Set<Long> genreIds,
+            @Param("platformIds") Set<Long> platformIds
+    );
+
+    @Query("""
+            SELECT COUNT(m) FROM MediaItem m
+            WHERE LOWER(m.name) LIKE LOWER(CONCAT('%', :name, '%'))
+            AND (:category IS NULL OR m.category = :category)
+            """)
+    Long countSimple(
+            @Param("name") String name,
+            @Param("category") Category category
+    );
+
 }

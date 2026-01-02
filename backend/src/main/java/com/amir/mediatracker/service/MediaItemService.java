@@ -41,6 +41,24 @@ public class MediaItemService {
         Set<Long> safeGenres = genreIds == null ? Set.of() : genreIds;
         Set<Long> safePlatforms = platformIds == null ? Set.of() : platformIds;
 
+        // Get the count first (before pagination)
+        long totalCount;
+        if (safeGenres.isEmpty() && safePlatforms.isEmpty()) {
+            totalCount = mediaItemRepository.countSimple(query, category);
+        } else {
+            try {
+                totalCount = mediaItemRepository.countWithFiltersSimple(
+                        query,
+                        category,
+                        safeGenres.isEmpty() ? null : safeGenres,
+                        safePlatforms.isEmpty() ? null : safePlatforms
+                );
+            } catch (Exception e) {
+                log.error("Failed to count with filters, falling back to simple count", e);
+                totalCount = mediaItemRepository.countSimple(query, category);
+            }
+        }
+
         List<MediaItem> items = mediaItemRepository.searchWithCursorAndFilters(
                 query,
                 category,
@@ -72,6 +90,7 @@ public class MediaItemService {
                 .items(responses)
                 .nextCursor(nextCursor)
                 .hasMore(hasMore)
+                .totalCount(totalCount)
                 .build();
     }
 

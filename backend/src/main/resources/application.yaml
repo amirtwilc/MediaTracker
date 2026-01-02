@@ -74,8 +74,8 @@ jwt:
 # Logging
 logging:
   level:
-    org.springframework.graphql: DEBUG
-    com.amir.mediatracker: DEBUG
+    org.springframework.graphql: INFO
+    com.amir.mediatracker: INFO
     org.springframework.batch: INFO
     org.springframework.kafka: INFO
     org.hibernate.SQL: INFO

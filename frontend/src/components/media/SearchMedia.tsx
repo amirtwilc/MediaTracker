@@ -1,18 +1,31 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Search, Plus, Check, Filter, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, X } from 'lucide-react';
-import { MediaItem, UserMediaListItem } from '../../types';
+import { MediaItem, UserMediaListItem, Genre, Platform } from '../../types';
 import { api } from '../../services/api';
 import { StarRating } from '../common/StarRating';
 import { getCategoryColor } from '../../utils/categoryColors';
 
+interface CachedPage {
+  items: MediaItem[];
+  cursor: { name: string; id: number } | null;
+  hasMore: boolean;
+  totalCount: number;
+}
+
+interface PageCache {
+  [key: string]: CachedPage;
+}
+
 export const SearchMedia: React.FC = () => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<MediaItem[]>([]);
-  const [allResults, setAllResults] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [hasPrevPage, setHasPrevPage] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [totalCount, setTotalCount] = useState<number>(0);
+  const [totalPages, setTotalPages] = useState<number>(0);
 
   // Error notification
   const [errorMessage, setErrorMessage] = useState<string>('');
@@ -26,6 +39,8 @@ export const SearchMedia: React.FC = () => {
   // All available genres and platforms
   const [allGenres, setAllGenres] = useState<string[]>([]);
   const [allPlatforms, setAllPlatforms] = useState<string[]>([]);
+  const [genres, setGenres] = useState<Genre[]>([]);
+  const [platforms, setPlatforms] = useState<Platform[]>([]);
 
   // Sorting
   const [sortConfig, setSortConfig] = useState<Array<{key: string; direction: 'asc' | 'desc'}>>([]);
@@ -36,20 +51,26 @@ export const SearchMedia: React.FC = () => {
   const [editState, setEditState] = useState<Partial<UserMediaListItem>>({});
   const [userListItemIds, setUserListItemIds] = useState<Map<number, number>>(new Map());
 
+  // Cursor-based pagination state
+  const [cursors, setCursors] = useState<Array<{ name: string; id: number } | null>>([null]); // cursors[i] = cursor to get page i
+  const [pageCache, setPageCache] = useState<PageCache>({});
+  const [prefetchInProgress, setPrefetchInProgress] = useState<Set<number>>(new Set());
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   useEffect(() => {
-    loadLatestItems();
     loadGenresAndPlatforms();
     loadUserList();
+    // Load all items on mount, sorted by year (newest first)
+    setSortConfig([{ key: 'year', direction: 'desc' }]);
+    handleInitialLoad();
   }, []);
 
   useEffect(() => {
-    if (query || filterCategories.length > 0 || filterGenres.length > 0 || filterPlatforms.length > 0) {
-      applyFiltersAndSearch();
-    } else if (hasSearched) {
-      // When all filters are cleared, reload latest items
-      loadLatestItems();
+    // Reset pagination when filters change
+    if (hasSearched) {
+      handleSearch();
     }
-  }, [filterCategories, filterGenres, filterPlatforms]);
+  }, [filterCategories, filterGenres, filterPlatforms, sortConfig]);
 
   // Auto-hide error message after 5 seconds
   useEffect(() => {
@@ -61,6 +82,20 @@ export const SearchMedia: React.FC = () => {
     }
   }, [errorMessage]);
 
+  // Prefetch adjacent pages when current page changes
+  useEffect(() => {
+    if (hasSearched && results.length > 0) {
+      // Prefetch next page if it exists
+      if (hasNextPage && currentPage + 1 < cursors.length) {
+        prefetchPage(currentPage + 1);
+      }
+      // Prefetch previous page if it exists
+      if (currentPage > 0) {
+        prefetchPage(currentPage - 1);
+      }
+    }
+  }, [currentPage, hasSearched]);
+
   const loadUserList = async () => {
     try {
       const list = await api.getMyMediaList(0, 1000);
@@ -71,29 +106,14 @@ export const SearchMedia: React.FC = () => {
     }
   };
 
-  const loadLatestItems = async () => {
-    setLoading(true);
-    try {
-      const data = await api.searchMediaItems('', undefined, 0, 200);
-      const sorted = data.sort((a, b) => (b.year || 0) - (a.year || 0));
-      setAllResults(sorted);
-      setResults(sorted.slice(0, 20));
-      setCurrentPage(0);
-      setTotalPages(Math.ceil(sorted.length / 20));
-      setHasSearched(false);
-    } catch (error) {
-      console.error('Failed to load items', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const loadGenresAndPlatforms = async () => {
     try {
       const [genresData, platformsData] = await Promise.all([
         api.getAllGenres(),
         api.getAllPlatforms(),
       ]);
+      setGenres(genresData);
+      setPlatforms(platformsData);
       setAllGenres(genresData.map(g => g.name).sort());
       setAllPlatforms(platformsData.map(p => p.name).sort());
     } catch (error) {
@@ -101,63 +121,200 @@ export const SearchMedia: React.FC = () => {
     }
   };
 
-  const applyFiltersAndSearch = async () => {
-    setLoading(true);
-    setHasSearched(true);
-    setCurrentPage(0);
+  const getCacheKey = (page: number): string => {
+    const filters = {
+      query,
+      categories: filterCategories.sort(),
+      genres: filterGenres.sort(),
+      platforms: filterPlatforms.sort(),
+      sort: sortConfig,
+    };
+    return `${page}-${JSON.stringify(filters)}`;
+  };
+
+  const fetchPage = async (
+    pageNum: number,
+    cursor: { name: string; id: number } | null,
+    signal?: AbortSignal
+  ): Promise<CachedPage> => {
+    const genreIds = filterGenres.length > 0
+      ? genres.filter(g => filterGenres.includes(g.name)).map(g => g.id)
+      : undefined;
+
+    const platformIds = filterPlatforms.length > 0
+      ? platforms.filter(p => filterPlatforms.includes(p.name)).map(p => p.id)
+      : undefined;
+
+    // Only pass single category to backend, handle multiple categories client-side
+    const category = filterCategories.length === 1 ? filterCategories[0] : undefined;
+
+    const response = await api.searchMediaItemsCursor({
+      query: query || '',
+      category,
+      genreIds,
+      platformIds,
+      cursorName: cursor?.name,
+      cursorId: cursor?.id,
+      limit: 20,
+    });
+
+    // Filter by categories client-side if multiple are selected
+    let filteredItems = response.items;
+    if (filterCategories.length > 1) {
+      filteredItems = response.items.filter(item => 
+        filterCategories.includes(item.category)
+      );
+    }
+
+    // Apply client-side sorting if needed
+    let sortedItems = filteredItems;
+    if (sortConfig.length > 0) {
+      sortedItems = applySorting([...filteredItems]);
+    }
+
+    return {
+      items: sortedItems,
+      cursor: response.nextCursor || null,
+      hasMore: response.hasMore,
+      totalCount: response.totalCount,
+    };
+  };
+
+  const prefetchPage = async (pageNum: number) => {
+    const cacheKey = getCacheKey(pageNum);
+    
+    // Don't prefetch if already cached or in progress
+    if (pageCache[cacheKey] || prefetchInProgress.has(pageNum)) {
+      return;
+    }
+
+    // Don't prefetch if we don't have the cursor
+    if (pageNum >= cursors.length) {
+      return;
+    }
+
+    setPrefetchInProgress(prev => new Set(prev).add(pageNum));
 
     try {
-      // Fetch data based on query and category filter
-      const data = await api.searchMediaItems(query || '', undefined, 0, 200);
-
-      let filtered = data;
-
-      // Apply category filter
-      if (filterCategories.length > 0) {
-        filtered = filtered.filter(item =>
-          filterCategories.includes(item.category)
-        );
-      }
-
-      // Apply genre filter
-      if (filterGenres.length > 0) {
-        filtered = filtered.filter(item =>
-          item.genres.some(g => filterGenres.includes(g.name))
-        );
-      }
-
-      // Apply platform filter
-      if (filterPlatforms.length > 0) {
-        filtered = filtered.filter(item =>
-          item.platforms.some(p => filterPlatforms.includes(p.name))
-        );
-      }
-
-      // Apply sorting
-      const sorted = applySorting(filtered);
+      const cursor = cursors[pageNum];
+      const result = await fetchPage(pageNum, cursor);
       
-      setAllResults(sorted);
-      setResults(sorted.slice(0, 20));
-      setTotalPages(Math.max(1, Math.ceil(sorted.length / 20)));
+      setPageCache(prev => ({
+        ...prev,
+        [cacheKey]: result,
+      }));
+
+      // Update cursors array if we got a next cursor
+      if (result.hasMore && result.cursor) {
+        setCursors(prev => {
+          const newCursors = [...prev];
+          if (pageNum + 1 >= newCursors.length) {
+            newCursors.push(result.cursor);
+          }
+          return newCursors;
+        });
+      }
     } catch (error) {
-      console.error('Search failed', error);
-      setAllResults([]);
-      setResults([]);
-      setTotalPages(0);
+      console.error(`Failed to prefetch page ${pageNum}`, error);
     } finally {
-      setLoading(false);
+      setPrefetchInProgress(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(pageNum);
+        return newSet;
+      });
     }
   };
 
-  const handleSearch = () => {
-    applyFiltersAndSearch();
+  const loadPage = async (pageNum: number) => {
+    const cacheKey = getCacheKey(pageNum);
+
+    // Check cache first
+    if (pageCache[cacheKey]) {
+      const cached = pageCache[cacheKey];
+      setResults(cached.items);
+      setHasNextPage(cached.hasMore);
+      setHasPrevPage(pageNum > 0);
+      setCurrentPage(pageNum);
+      setTotalCount(cached.totalCount);
+      setTotalPages(Math.ceil(cached.totalCount / 20));
+      return;
+    }
+
+    // Abort any in-flight requests
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    abortControllerRef.current = new AbortController();
+    setLoading(true);
+
+    try {
+      const cursor = cursors[pageNum];
+      const result = await fetchPage(pageNum, cursor, abortControllerRef.current.signal);
+
+      // Cache the result
+      setPageCache(prev => ({
+        ...prev,
+        [cacheKey]: result,
+      }));
+
+      // Update cursors array
+      if (result.hasMore && result.cursor) {
+        setCursors(prev => {
+          const newCursors = [...prev];
+          if (pageNum + 1 >= newCursors.length) {
+            newCursors.push(result.cursor);
+          }
+          return newCursors;
+        });
+      }
+
+      setResults(result.items);
+      setHasNextPage(result.hasMore);
+      setHasPrevPage(pageNum > 0);
+      setCurrentPage(pageNum);
+      setTotalCount(result.totalCount);
+      setTotalPages(Math.ceil(result.totalCount / 20));
+    } catch (error: any) {
+      if (error.name !== 'AbortError') {
+        console.error('Search failed', error);
+        setResults([]);
+        setHasNextPage(false);
+        setHasPrevPage(false);
+        setTotalCount(0);
+        setTotalPages(0);
+      }
+    } finally {
+      setLoading(false);
+      abortControllerRef.current = null;
+    }
   };
 
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-    const startIdx = page * 20;
-    const endIdx = startIdx + 20;
-    setResults(allResults.slice(startIdx, endIdx));
+  const handleSearch = async () => {
+    // Reset pagination state
+    setCurrentPage(0);
+    setCursors([null]);
+    setPageCache({});
+    setHasSearched(true);
+    
+    await loadPage(0);
+  };
+
+  const handleInitialLoad = async () => {
+    setHasSearched(true);
+    await loadPage(0);
+  };
+
+  const handleNextPage = () => {
+    if (hasNextPage) {
+      loadPage(currentPage + 1);
+    }
+  };
+
+  const handlePrevPage = () => {
+    if (currentPage > 0) {
+      loadPage(currentPage - 1);
+    }
   };
 
   const handleClearSearch = () => {
@@ -167,14 +324,17 @@ export const SearchMedia: React.FC = () => {
     setFilterPlatforms([]);
     setSortConfig([]);
     setHasSearched(false);
-    loadLatestItems();
+    setResults([]);
+    setCurrentPage(0);
+    setCursors([null]);
+    setPageCache({});
   };
 
-  const applySorting = (items: MediaItem[], config: Array<{ key: string; direction: 'asc' | 'desc' }> = sortConfig) => {
-    if (config.length === 0) return items;
+  const applySorting = (items: MediaItem[]) => {
+    if (sortConfig.length === 0) return items;
 
     return [...items].sort((a, b) => {
-      for (const sort of config) {
+      for (const sort of sortConfig) {
         let comparison = 0;
 
         switch (sort.key) {
@@ -204,27 +364,15 @@ export const SearchMedia: React.FC = () => {
   const handleSort = (key: string) => {
     setSortConfig(prev => {
       const existing = prev.find(s => s.key === key);
-      let newConfig;
       if (existing) {
         if (existing.direction === 'asc') {
-          newConfig = prev.map(s => s.key === key ? { ...s, direction: 'desc' as 'desc' } : s);
+          return prev.map(s => s.key === key ? { ...s, direction: 'desc' as 'desc' } : s);
         } else {
-          newConfig = prev.filter(s => s.key !== key);
+          return prev.filter(s => s.key !== key);
         }
       } else {
-        newConfig = [...prev, { key, direction: 'asc' as 'asc' }];
+        return [...prev, { key, direction: 'asc' as 'asc' }];
       }
-      
-      // Apply sorting immediately to all results
-      const sorted = applySorting(allResults, newConfig);
-      setAllResults(sorted);
-      
-      // Update current page results
-      const startIdx = currentPage * 20;
-      const endIdx = startIdx + 20;
-      setResults(sorted.slice(startIdx, endIdx));
-      
-      return newConfig;
     });
   };
 
@@ -433,12 +581,7 @@ export const SearchMedia: React.FC = () => {
             </span>
           ))}
           <button
-            onClick={() => {
-              setSortConfig([]);
-              const startIdx = currentPage * 20;
-              const endIdx = startIdx + 20;
-              setResults(allResults.slice(startIdx, endIdx));
-            }}
+            onClick={() => setSortConfig([])}
             className="ml-4 text-sm text-red-400 hover:text-red-300"
           >
             Clear sorts
@@ -448,11 +591,11 @@ export const SearchMedia: React.FC = () => {
 
       {loading ? (
         <div className="text-center py-8 text-gray-400">Loading...</div>
-      ) : results.length === 0 ? (
+      ) : results.length === 0 && hasSearched ? (
         <div className="text-center py-8 text-gray-400">
           No results found. Try a different search term.
         </div>
-      ) : (
+      ) : results.length > 0 ? (
         <>
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -615,29 +758,38 @@ export const SearchMedia: React.FC = () => {
           </div>
 
           {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-4">
-              <button
-                onClick={() => handlePageChange(currentPage - 1)}
-                disabled={currentPage === 0}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ChevronLeft size={20} />
-              </button>
-              <span className="text-gray-300">
-                Page {currentPage + 1} of {totalPages}
-              </span>
-              <button
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={currentPage >= totalPages - 1}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ChevronRight size={20} />
-              </button>
-            </div>
-          )}
+          <div className="flex items-center justify-center gap-4">
+            <button
+              onClick={handlePrevPage}
+              disabled={!hasPrevPage || loading}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              <ChevronLeft size={20} />
+              Previous
+            </button>
+            <span className="text-gray-300">
+              Page {currentPage + 1}
+              {totalPages > 0 && ` of ${totalPages}`}
+              {totalCount > 0 && (
+                <span className="text-xs text-gray-400 ml-2">
+                  ({totalCount} items)
+                </span>
+              )}
+              {prefetchInProgress.size > 0 && (
+                <span className="ml-2 text-xs text-blue-400">(prefetching...)</span>
+              )}
+            </span>
+            <button
+              onClick={handleNextPage}
+              disabled={!hasNextPage || loading}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              Next
+              <ChevronRight size={20} />
+            </button>
+          </div>
         </>
-      )}
+      ) : null}
     </div>
   );
 };

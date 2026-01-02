@@ -8,9 +8,9 @@ import java.util.List;
 
 @Data
 @Builder
-public class MediaSearchResponse {
+public class UserMediaListSearchResponse {
 
-    private List<MediaItemResponse> items;
+    private List<UserMediaListResponse> items;
 
     private Cursor nextCursor;
 
