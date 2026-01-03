@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Edit2, Trash2, X, Filter, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import { UserMediaListItem, Genre, Platform } from '../../types';
 import { api } from '../../services/api';
@@ -69,36 +69,8 @@ export const MyMediaList: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Initial load
-  useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      loadPage(0);
-      loadAvailableFilters();
-    }
-  }, []);
-
-  // Reload when ANY filter changes (but not on initial mount)
-  // This consolidates all filter changes into a single trigger point
-  useEffect(() => {
-    if (!isInitialMount.current) {
-      handleSearch();
-    }
-  }, [sortConfig]);
-  
-  // Prefetch adjacent pages when current page changes
-  useEffect(() => {
-    if (items.length > 0) {
-      if (hasNextPage && currentPage + 1 < cursors.length) {
-        prefetchPage(currentPage + 1);
-      }
-      if (currentPage > 0) {
-        prefetchPage(currentPage - 1);
-      }
-    }
-  }, [currentPage]);
-
-  const loadAvailableFilters = async () => {
+  // Memoize loadAvailableFilters to prevent recreation on every render
+  const loadAvailableFilters = useCallback(async () => {
     try {
       const categories = filterCategories.length > 0 ? filterCategories : undefined;
       
@@ -118,7 +90,42 @@ export const MyMediaList: React.FC = () => {
     } catch (error) {
       console.error('Failed to load available filters', error);
     }
-  };
+  }, [debouncedSearchQuery, filterCategories]);
+
+  // Initial load only
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      loadPage(0);
+      loadAvailableFilters();
+    }
+  }, []);
+
+  // Reload when filters change (but not on initial mount)
+  useEffect(() => {
+    if (!isInitialMount.current) {
+      handleSearch();
+    }
+  }, [debouncedSearchQuery, filterCategories, filterGenres, filterPlatforms, wishToExperienceFilter]);
+
+  // Reload when sort changes
+  useEffect(() => {
+    if (!isInitialMount.current && sortConfig !== null) {
+      handleSearch();
+    }
+  }, [sortConfig]);
+  
+  // Prefetch adjacent pages when current page changes
+  useEffect(() => {
+    if (items.length > 0) {
+      if (hasNextPage && currentPage + 1 < cursors.length) {
+        prefetchPage(currentPage + 1);
+      }
+      if (currentPage > 0) {
+        prefetchPage(currentPage - 1);
+      }
+    }
+  }, [currentPage]);
 
   const getCacheKey = (page: number): string => {
     const filters = {
@@ -380,13 +387,6 @@ export const MyMediaList: React.FC = () => {
     });
   };
 
-  // Trigger search when sort changes
-  useEffect(() => {
-    if (!isInitialMount.current) {
-      handleSearch();
-    }
-  }, [sortConfig]);
-
   const getSortIcon = (key: string) => {
     if (!sortConfig || sortConfig.key !== key) return null;
     
@@ -626,153 +626,154 @@ export const MyMediaList: React.FC = () => {
                       </td>
                       <td className="px-4 py-3 text-gray-200 text-sm">
                         {item.mediaItem.platforms.map(p => p.name).join(', ')}
-</td>
-<td className="px-4 py-3 text-center">
-{isEditing ? (
-<input
-type="checkbox"
-checked={currentExperienced || false}
-onChange={(e) => setEditState({
-...editState,
-experienced: e.target.checked,
-...(e.target.checked ? {} : { rating: undefined, wishToReexperience: false })
-})}
-className="w-4 h-4"
-/>
-) : (
-<span>{item.experienced ? '✓' : '-'}</span>
-)}
-</td>
-<td className="px-4 py-3 text-center">
-{isEditing && currentExperienced ? (
-<input
-type="checkbox"
-checked={editState.wishToReexperience || false}
-onChange={(e) => setEditState({
-...editState,
-wishToReexperience: e.target.checked
-})}
-className="w-4 h-4"
-/>
-) : (
-<span>{item.wishToReexperience ? '✓' : '-'}</span>
-)}
-</td>
-<td className="px-4 py-3">
-{isEditing && currentExperienced ? (
-<StarRating
-rating={editState.rating}
-onChange={(rating) => setEditState({
-...editState,
-rating
-})}
-/>
-) : (
-<StarRating rating={item.rating} readonly />
-)}
-</td>
-<td className="px-4 py-3">
-{isEditing ? (
-<input
-type="text"
-maxLength={100}
-value={editState.comment || ''}
-onChange={(e) => setEditState({
-...editState,
-comment: e.target.value
-})}
-placeholder="Add comment..."
-className="w-full px-2 py-1 bg-gray-700 text-white rounded border border-gray-600 text-sm"
-/>
-) : (
-<span className="text-sm text-gray-300">{item.comment || '-'}</span>
-)}
-</td>
-<td className="px-4 py-3 text-right">
-<div className="flex gap-2 justify-end">
-{isEditing ? (
-<>
-<button
-onClick={() => handleSaveEdit(item.id)}
-className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs"
-title="Save changes"
->
-Save
-</button>
-<button
-                             onClick={handleCancelEdit}
-                             className="p-1 hover:bg-gray-700 rounded"
-                             title="Cancel"
-                           >
-<X size={16} />
-</button>
-</>
-) : (
-<button
-onClick={() => handleStartEdit(item)}
-className="p-1 hover:bg-gray-700 rounded text-blue-400"
-title="Edit"
->
-<Edit2 size={16} />
-</button>
-)}
-<button
-onClick={() => handleRemove(item.id)}
-className="p-1 hover:bg-gray-700 rounded text-red-400"
-title="Delete"
->
-<Trash2 size={16} />
-</button>
-</div>
-</td>
-</tr>
-);
-})}
-</tbody>
-</table>
-</div>
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-4 mt-4">
-          <button
-            onClick={handlePrevPage}
-            disabled={!hasPrevPage || loading}
-            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            <ChevronLeft size={20} />
-            Previous
-          </button>
-          <span className="text-gray-300">
-            Page {currentPage + 1} of {totalPages}
-            {totalCount > 0 && (
-              <span className="text-xs text-gray-400 ml-2">
-                ({totalCount} items)
-              </span>
-            )}
-            {prefetchInProgress.size > 0 && (
-              <span className="ml-2 text-xs text-blue-400">(prefetching...)</span>
-            )}
-          </span>
-          <button
-            onClick={handleNextPage}
-            disabled={!hasNextPage || loading}
-            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            Next
-            <ChevronRight size={20} />
-          </button>
-        </div>
-      )}
-    </>
-  )}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {isEditing ? (
+                          <input
+                            type="checkbox"
+                            checked={currentExperienced || false}
+                            onChange={(e) => setEditState({
+                              ...editState,
+                              experienced: e.target.checked,
+                              ...(e.target.checked ? {} : { rating: undefined, wishToReexperience: false })
+                            })}
+                            className="w-4 h-4"
+                          />
+                        ) : (
+                          <span>{item.experienced ? '✓' : '-'}</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {isEditing && currentExperienced ? (
+                          <input
+                            type="checkbox"
+                            checked={editState.wishToReexperience || false}
+                            onChange={(e) => setEditState({
+                              ...editState,
+                              wishToReexperience: e.target.checked
+                            })}
+                            className="w-4 h-4"
+                          />
+                        ) : (
+                          <span>{item.wishToReexperience ? '✓' : '-'}</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {isEditing && currentExperienced ? (
+                          <StarRating
+                            rating={editState.rating}
+                            onChange={(rating) => setEditState({
+                              ...editState,
+                              rating
+                            })}
+                          />
+                        ) : (
+                          <StarRating rating={item.rating} readonly />
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            maxLength={100}
+                            value={editState.comment || ''}
+                            onChange={(e) => setEditState({
+                              ...editState,
+                              comment: e.target.value
+                            })}
+                            placeholder="Add comment..."
+                            className="w-full px-2 py-1 bg-gray-700 text-white rounded border border-gray-600 text-sm"
+                          />
+                        ) : (
+                          <span className="text-sm text-gray-300">{item.comment || '-'}</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex gap-2 justify-end">
+                          {isEditing ? (
+                            <>
+                              <button
+                                onClick={() => handleSaveEdit(item.id)}
+                                className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs"
+                                title="Save changes"
+                              >
+                                Save
+                              </button>
+                              <button
+                                onClick={handleCancelEdit}
+                                className="p-1 hover:bg-gray-700 rounded"
+                                title="Cancel"
+                              >
+                                <X size={16} />
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              onClick={() => handleStartEdit(item)}
+                              className="p-1 hover:bg-gray-700 rounded text-blue-400"
+                              title="Edit"
+                            >
+                              <Edit2 size={16} />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleRemove(item.id)}
+                            className="p-1 hover:bg-gray-700 rounded text-red-400"
+                            title="Delete"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
 
-  <ConfirmModal
-    isOpen={deleteConfirm.show}
-    title="Remove Item"
-    message="Are you sure you want to remove this item from your list?"
-    onConfirm={confirmDelete}
-    onCancel={() => setDeleteConfirm({ show: false, id: null })}
-  />
-</div>
-);
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-4 mt-4">
+              <button
+                onClick={handlePrevPage}
+                disabled={!hasPrevPage || loading}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                <ChevronLeft size={20} />
+                Previous
+              </button>
+              <span className="text-gray-300">
+                Page {currentPage + 1} of {totalPages}
+                {totalCount > 0 && (
+                  <span className="text-xs text-gray-400 ml-2">
+                    ({totalCount} items)
+                  </span>
+                )}
+                {prefetchInProgress.size > 0 && (
+                  <span className="ml-2 text-xs text-blue-400">(prefetching...)</span>
+                )}
+              </span>
+              <button
+                onClick={handleNextPage}
+                disabled={!hasNextPage || loading}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                Next
+                <ChevronRight size={20} />
+              </button>
+            </div>
+          )}
+        </>
+      )}
+
+      <ConfirmModal
+        isOpen={deleteConfirm.show}
+        title="Remove Item"
+        message="Are you sure you want to remove this item from your list?"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteConfirm({ show: false, id: null })}
+      />
+    </div>
+  );
 }
