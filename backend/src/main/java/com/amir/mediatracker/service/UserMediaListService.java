@@ -3,9 +3,7 @@ package com.amir.mediatracker.service;
 import com.amir.mediatracker.dto.Category;
 import com.amir.mediatracker.dto.request.UpdateMediaListRequest;
 import com.amir.mediatracker.dto.response.*;
-import com.amir.mediatracker.entity.MediaItem;
-import com.amir.mediatracker.entity.User;
-import com.amir.mediatracker.entity.UserMediaList;
+import com.amir.mediatracker.entity.*;
 import com.amir.mediatracker.exception.DuplicateResourceException;
 import com.amir.mediatracker.exception.ResourceNotFoundException;
 import com.amir.mediatracker.repository.MediaItemRepository;
@@ -59,7 +57,7 @@ public class UserMediaListService {
     public UserMediaListSearchResponse getUserMediaListCursor(
             Long userId,
             String searchQuery,
-            Category category,
+            Set<Category> categories,
             Set<Long> genreIds,
             Set<Long> platformIds,
             Boolean wishToExperience,
@@ -71,18 +69,19 @@ public class UserMediaListService {
 
         Set<Long> safeGenres = genreIds == null ? Set.of() : genreIds;
         Set<Long> safePlatforms = platformIds == null ? Set.of() : platformIds;
+        Set<Category> safeCategories = (categories == null || categories.isEmpty()) ? null : categories;
         boolean safeWishToExperience = wishToExperience != null && wishToExperience;
         String safeSearchQuery = searchQuery == null ? "" : searchQuery;
         String safeCursorName = cursorName == null ? "" : cursorName;
         Long safeCursorId = cursorId == null ? 0L : cursorId;
 
-        // Get total count with filters using simpler query
+        // Get total count with filters
         long totalCount;
         try {
             totalCount = userMediaListRepository.countByUserIdWithFiltersSimple(
                     userId,
                     safeSearchQuery,
-                    category,
+                    safeCategories,
                     safeGenres.isEmpty() ? null : safeGenres,
                     safePlatforms.isEmpty() ? null : safePlatforms,
                     safeWishToExperience
@@ -92,11 +91,11 @@ public class UserMediaListService {
             totalCount = userMediaListRepository.countByUserId(userId);
         }
 
-        // Fetch items with cursor and filters
+        // Fetch items with cursor and filters (sorted by name by default)
         List<UserMediaList> items = userMediaListRepository.findByUserIdWithFilters(
                 userId,
                 safeSearchQuery,
-                category,
+                safeCategories,
                 safeGenres.isEmpty() ? null : safeGenres,
                 safePlatforms.isEmpty() ? null : safePlatforms,
                 safeGenres.size(),
@@ -131,6 +130,78 @@ public class UserMediaListService {
                 .hasMore(hasMore)
                 .totalCount(totalCount)
                 .build();
+    }
+
+    public Page<UserMediaListResponse> getUserMediaListSorted(
+            Long userId,
+            String searchQuery,
+            Set<Category> categories,
+            Set<Long> genreIds,
+            Set<Long> platformIds,
+            Boolean wishToExperience,
+            int page,
+            int size,
+            String sortBy,
+            String sortDirection
+    ) {
+        Set<Long> safeGenres = genreIds == null ? Set.of() : genreIds;
+        Set<Long> safePlatforms = platformIds == null ? Set.of() : platformIds;
+        Set<Category> safeCategories = (categories == null || categories.isEmpty()) ? null : categories;
+        boolean safeWishToExperience = wishToExperience != null && wishToExperience;
+        String safeSearchQuery = searchQuery == null ? "" : searchQuery;
+        String safeSortBy = sortBy == null || sortBy.isEmpty() ? "name" : sortBy;
+        String safeSortDirection = sortDirection == null || sortDirection.isEmpty() ? "ASC" : sortDirection.toUpperCase();
+
+        // Build the Sort object
+        Sort sort = buildSort(safeSortBy, safeSortDirection);
+        Pageable pageable = PageRequest.of(page, size, sort);
+
+        // Fetch page with sorting
+        Page<UserMediaList> itemsPage = userMediaListRepository.findByUserIdWithFiltersSorted(
+                userId,
+                safeSearchQuery,
+                safeCategories,
+                safeGenres.isEmpty() ? null : safeGenres,
+                safePlatforms.isEmpty() ? null : safePlatforms,
+                safeGenres.size(),
+                safePlatforms.size(),
+                safeWishToExperience,
+                pageable
+        );
+
+        // Map to response
+        return itemsPage.map(this::mapToResponse);
+    }
+
+    private Sort buildSort(String sortBy, String sortDirection) {
+        Sort.Direction direction = "DESC".equalsIgnoreCase(sortDirection)
+                ? Sort.Direction.DESC
+                : Sort.Direction.ASC;
+
+        // Map frontend sort keys to entity properties
+        String property;
+        switch (sortBy) {
+            case "name":
+                property = "mediaItem.name";
+                break;
+            case "year":
+                property = "mediaItem.year";
+                break;
+            case "experienced":
+                property = "experienced";
+                break;
+            case "reexperience":
+                property = "wishToReexperience";
+                break;
+            case "rating":
+                property = "rating";
+                break;
+            default:
+                property = "mediaItem.name";
+        }
+
+        // Add secondary sort by ID for stable ordering
+        return Sort.by(direction, property).and(Sort.by(Sort.Direction.ASC, "id"));
     }
 
     @Transactional
@@ -236,5 +307,27 @@ public class UserMediaListService {
                 .createdAt(item.getCreatedAt())
                 .updatedAt(item.getUpdatedAt())
                 .build();
+    }
+
+    public List<GenreResponse> getUserGenres(Long userId, String searchQuery, Set<Category> categories) {
+        String safeSearchQuery = searchQuery == null ? "" : searchQuery;
+        Set<Category> safeCategories = (categories == null || categories.isEmpty()) ? null : categories;
+        List<Genre> genres = userMediaListRepository.findDistinctGenresByUserId(
+                userId, safeSearchQuery, safeCategories
+        );
+        return genres.stream()
+                .map(g -> GenreResponse.builder().id(g.getId()).name(g.getName()).build())
+                .collect(Collectors.toList());
+    }
+
+    public List<PlatformResponse> getUserPlatforms(Long userId, String searchQuery, Set<Category> categories) {
+        String safeSearchQuery = searchQuery == null ? "" : searchQuery;
+        Set<Category> safeCategories = (categories == null || categories.isEmpty()) ? null : categories;
+        List<Platform> platforms = userMediaListRepository.findDistinctPlatformsByUserId(
+                userId, safeSearchQuery, safeCategories
+        );
+        return platforms.stream()
+                .map(p -> PlatformResponse.builder().id(p.getId()).name(p.getName()).build())
+                .collect(Collectors.toList());
     }
 }

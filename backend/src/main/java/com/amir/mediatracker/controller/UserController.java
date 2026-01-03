@@ -13,6 +13,7 @@ import com.amir.mediatracker.service.MediaItemService;
 import com.amir.mediatracker.service.UserMediaListService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -81,7 +82,7 @@ public class UserController {
     @GetMapping("/my-list/cursor")
     public ResponseEntity<UserMediaListSearchResponse> getMyMediaListCursor(
             @RequestParam(required = false) String searchQuery,
-            @RequestParam(required = false) Category category,
+            @RequestParam(required = false) Set<Category> categories,
             @RequestParam(required = false) Set<Long> genreIds,
             @RequestParam(required = false) Set<Long> platformIds,
             @RequestParam(required = false) Boolean wishToExperience,
@@ -94,13 +95,43 @@ public class UserController {
                 userMediaListService.getUserMediaListCursor(
                         userId,
                         searchQuery,
-                        category,
+                        categories,
                         genreIds,
                         platformIds,
                         wishToExperience,
                         cursorName,
                         cursorId,
                         limit
+                )
+        );
+    }
+    // Get user's media list with offset pagination and sorting
+    @LogAround
+    @GetMapping("/my-list/sorted")
+    public ResponseEntity<Page<UserMediaListResponse>> getMyMediaListSorted(
+            @RequestParam(required = false) String searchQuery,
+            @RequestParam(required = false) Set<Category> categories,
+            @RequestParam(required = false) Set<Long> genreIds,
+            @RequestParam(required = false) Set<Long> platformIds,
+            @RequestParam(required = false) Boolean wishToExperience,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "name") String sortBy,
+            @RequestParam(defaultValue = "ASC") String sortDirection,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        Long userId = userPrincipal.getId();
+        return ResponseEntity.ok(
+                userMediaListService.getUserMediaListSorted(
+                        userId,
+                        searchQuery,
+                        categories,
+                        genreIds,
+                        platformIds,
+                        wishToExperience,
+                        page,
+                        size,
+                        sortBy,
+                        sortDirection
                 )
         );
     }
@@ -191,5 +222,27 @@ public class UserController {
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
         Long userId = userPrincipal.getId();
         return ResponseEntity.ok(followService.getFollowing(userId));
+    }
+
+    // Get user's available genres (from their list)
+    @LogAround
+    @GetMapping("/my-list/genres")
+    public ResponseEntity<List<GenreResponse>> getMyListGenres(
+            @RequestParam(required = false) String searchQuery,
+            @RequestParam(required = false) Set<Category> categories,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        Long userId = userPrincipal.getId();
+        return ResponseEntity.ok(userMediaListService.getUserGenres(userId, searchQuery, categories));
+    }
+
+    // Get user's available platforms (from their list)
+    @LogAround
+    @GetMapping("/my-list/platforms")
+    public ResponseEntity<List<PlatformResponse>> getMyListPlatforms(
+            @RequestParam(required = false) String searchQuery,
+            @RequestParam(required = false) Set<Category> categories,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        Long userId = userPrincipal.getId();
+        return ResponseEntity.ok(userMediaListService.getUserPlatforms(userId, searchQuery, categories));
     }
 }

@@ -1,6 +1,8 @@
 package com.amir.mediatracker.repository;
 
 import com.amir.mediatracker.dto.Category;
+import com.amir.mediatracker.entity.Genre;
+import com.amir.mediatracker.entity.Platform;
 import com.amir.mediatracker.entity.UserMediaList;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -35,7 +37,7 @@ public interface UserMediaListRepository extends JpaRepository<UserMediaList, Lo
             LEFT JOIN m.platforms p
             WHERE uml.user.id = :userId
             AND (:searchQuery = '' OR LOWER(m.name) LIKE LOWER(CONCAT('%', :searchQuery, '%')))
-            AND (:category IS NULL OR m.category = :category)
+            AND (:categories IS NULL OR m.category IN :categories)
             AND (:genreIds IS NULL OR g.id IN :genreIds)
             AND (:platformIds IS NULL OR p.id IN :platformIds)
             AND (:wishToExperience IS FALSE OR (uml.experienced = FALSE OR uml.wishToReexperience = TRUE))
@@ -43,7 +45,8 @@ public interface UserMediaListRepository extends JpaRepository<UserMediaList, Lo
                 :cursorName = '' OR
                 (m.name > :cursorName OR (m.name = :cursorName AND uml.id > :cursorId))
             )
-            GROUP BY uml.id, m.id, m.name, m.category, m.year, m.avgRating, m.createdAt, m.updatedAt
+            GROUP BY uml.id, m.id, m.name, m.category, m.year, m.avgRating, m.createdAt, m.updatedAt, 
+                     uml.experienced, uml.wishToReexperience, uml.rating, uml.addedAt, uml.updatedAt, uml.comment
             HAVING
                 (:genreCount = 0 OR COUNT(DISTINCT g.id) = :genreCount)
             AND (:platformCount = 0 OR COUNT(DISTINCT p.id) = :platformCount)
@@ -52,7 +55,7 @@ public interface UserMediaListRepository extends JpaRepository<UserMediaList, Lo
     List<UserMediaList> findByUserIdWithFilters(
             @Param("userId") Long userId,
             @Param("searchQuery") String searchQuery,
-            @Param("category") Category category,
+            @Param("categories") Set<Category> categories,
             @Param("genreIds") Set<Long> genreIds,
             @Param("platformIds") Set<Long> platformIds,
             @Param("genreCount") long genreCount,
@@ -64,13 +67,42 @@ public interface UserMediaListRepository extends JpaRepository<UserMediaList, Lo
     );
 
     @Query("""
+            SELECT uml FROM UserMediaList uml
+            JOIN uml.mediaItem m
+            LEFT JOIN m.genres g
+            LEFT JOIN m.platforms p
+            WHERE uml.user.id = :userId
+            AND (:searchQuery = '' OR LOWER(m.name) LIKE LOWER(CONCAT('%', :searchQuery, '%')))
+            AND (:categories IS NULL OR m.category IN :categories)
+            AND (:genreIds IS NULL OR g.id IN :genreIds)
+            AND (:platformIds IS NULL OR p.id IN :platformIds)
+            AND (:wishToExperience IS FALSE OR (uml.experienced = FALSE OR uml.wishToReexperience = TRUE))
+            GROUP BY uml.id, m.id, m.name, m.category, m.year, m.avgRating, m.createdAt, m.updatedAt, 
+                     uml.experienced, uml.wishToReexperience, uml.rating, uml.addedAt, uml.updatedAt, uml.comment
+            HAVING
+                (:genreCount = 0 OR COUNT(DISTINCT g.id) = :genreCount)
+            AND (:platformCount = 0 OR COUNT(DISTINCT p.id) = :platformCount)
+            """)
+    Page<UserMediaList> findByUserIdWithFiltersSorted(
+            @Param("userId") Long userId,
+            @Param("searchQuery") String searchQuery,
+            @Param("categories") Set<Category> categories,
+            @Param("genreIds") Set<Long> genreIds,
+            @Param("platformIds") Set<Long> platformIds,
+            @Param("genreCount") long genreCount,
+            @Param("platformCount") long platformCount,
+            @Param("wishToExperience") boolean wishToExperience,
+            Pageable pageable
+    );
+
+    @Query("""
             SELECT COUNT(DISTINCT uml.id) FROM UserMediaList uml
             JOIN uml.mediaItem m
             LEFT JOIN m.genres g
             LEFT JOIN m.platforms p
             WHERE uml.user.id = :userId
             AND (:searchQuery = '' OR LOWER(m.name) LIKE LOWER(CONCAT('%', :searchQuery, '%')))
-            AND (:category IS NULL OR m.category = :category)
+            AND (:categories IS NULL OR m.category IN :categories)
             AND (:genreIds IS NULL OR g.id IN :genreIds)
             AND (:platformIds IS NULL OR p.id IN :platformIds)
             AND (:wishToExperience IS FALSE OR (uml.experienced = FALSE OR uml.wishToReexperience = TRUE))
@@ -78,7 +110,7 @@ public interface UserMediaListRepository extends JpaRepository<UserMediaList, Lo
     Long countByUserIdWithFiltersSimple(
             @Param("userId") Long userId,
             @Param("searchQuery") String searchQuery,
-            @Param("category") Category category,
+            @Param("categories") Set<Category> categories,
             @Param("genreIds") Set<Long> genreIds,
             @Param("platformIds") Set<Long> platformIds,
             @Param("wishToExperience") boolean wishToExperience
@@ -86,4 +118,34 @@ public interface UserMediaListRepository extends JpaRepository<UserMediaList, Lo
 
     @Query("SELECT COUNT(uml) FROM UserMediaList uml WHERE uml.user.id = :userId")
     Long countByUserId(@Param("userId") Long userId);
+
+    @Query("""
+            SELECT DISTINCT g FROM UserMediaList uml
+            JOIN uml.mediaItem m
+            JOIN m.genres g
+            WHERE uml.user.id = :userId
+            AND (:searchQuery = '' OR LOWER(m.name) LIKE LOWER(CONCAT('%', :searchQuery, '%')))
+            AND (:categories IS NULL OR m.category IN :categories)
+            ORDER BY g.name ASC
+            """)
+    List<Genre> findDistinctGenresByUserId(
+            @Param("userId") Long userId,
+            @Param("searchQuery") String searchQuery,
+            @Param("categories") Set<Category> categories
+    );
+
+    @Query("""
+            SELECT DISTINCT p FROM UserMediaList uml
+            JOIN uml.mediaItem m
+            JOIN m.platforms p
+            WHERE uml.user.id = :userId
+            AND (:searchQuery = '' OR LOWER(m.name) LIKE LOWER(CONCAT('%', :searchQuery, '%')))
+            AND (:categories IS NULL OR m.category IN :categories)
+            ORDER BY p.name ASC
+            """)
+    List<Platform> findDistinctPlatformsByUserId(
+            @Param("userId") Long userId,
+            @Param("searchQuery") String searchQuery,
+            @Param("categories") Set<Category> categories
+    );
 }

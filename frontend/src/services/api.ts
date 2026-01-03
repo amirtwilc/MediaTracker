@@ -120,8 +120,8 @@ class ApiClient {
   }
 
   async getMyMediaListCursor(params: {
-    searchQuery: string;
-    category?: string;
+    searchQuery?: string;
+    categories?: string[];
     genreIds?: number[];
     platformIds?: number[];
     wishToExperience?: boolean;
@@ -142,9 +142,9 @@ class ApiClient {
       searchParams.append('searchQuery', params.searchQuery);
     }
 
-    if (params.category) {
-      searchParams.append('category', params.category);
-    }
+    params.categories?.forEach(cat =>
+      searchParams.append('categories', cat)
+    );
 
     if (params.wishToExperience !== undefined) {
       searchParams.append('wishToExperience', String(params.wishToExperience));
@@ -178,6 +178,61 @@ class ApiClient {
       totalCount: data.totalCount,
     };
   }
+
+  async getMyMediaListSorted(params: {
+    searchQuery?: string;
+    categories?: string[];
+    genreIds?: number[];
+    platformIds?: number[];
+    wishToExperience?: boolean;
+    page?: number;
+    size?: number;
+    sortBy?: string;
+    sortDirection?: string;
+  }): Promise<{
+    content: UserMediaListItem[];
+    totalPages: number;
+    totalElements: number;
+    number: number;
+    size: number;
+  }> {
+    const searchParams = new URLSearchParams({
+      page: String(params.page ?? 0),
+      size: String(params.size ?? 20),
+      sortBy: params.sortBy ?? 'name',
+      sortDirection: params.sortDirection ?? 'ASC',
+    });
+
+    if (params.searchQuery) {
+      searchParams.append('searchQuery', params.searchQuery);
+    }
+
+    params.categories?.forEach(cat =>
+      searchParams.append('categories', cat)
+    );
+
+    if (params.wishToExperience !== undefined) {
+      searchParams.append('wishToExperience', String(params.wishToExperience));
+    }
+
+    params.genreIds?.forEach(id =>
+      searchParams.append('genreIds', String(id))
+    );
+
+    params.platformIds?.forEach(id =>
+      searchParams.append('platformIds', String(id))
+    );
+
+    const res = await fetch(
+      `${API_BASE}/user/my-list/sorted?${searchParams.toString()}`,
+      { headers: this.getHeaders() }
+    );
+
+    if (!res.ok) throw new Error('Failed to fetch list');
+
+    return res.json();
+  }
+  
 
   async addToMyList(mediaItemId: number): Promise<UserMediaListItem> {
     const res = await fetch(`${API_BASE}/user/my-list`, {
@@ -424,6 +479,52 @@ class ApiClient {
     });
 
     if (!res.ok) throw new Error('Failed to update settings');
+    return res.json();
+  }
+
+  async getMyListGenres(params?: {
+    searchQuery?: string;
+    categories?: string[];
+  }): Promise<Genre[]> {
+    const searchParams = new URLSearchParams();
+
+    if (params?.searchQuery) {
+      searchParams.append('searchQuery', params.searchQuery);
+    }
+
+    params?.categories?.forEach(cat =>
+      searchParams.append('categories', cat)
+    );
+
+    const res = await fetch(
+      `${API_BASE}/user/my-list/genres?${searchParams.toString()}`,
+      { headers: this.getHeaders() }
+    );
+
+    if (!res.ok) throw new Error('Failed to fetch genres');
+    return res.json();
+  }
+
+  async getMyListPlatforms(params?: {
+    searchQuery?: string;
+    categories?: string[];
+  }): Promise<Platform[]> {
+    const searchParams = new URLSearchParams();
+
+    if (params?.searchQuery) {
+      searchParams.append('searchQuery', params.searchQuery);
+    }
+
+    params?.categories?.forEach(cat =>
+      searchParams.append('categories', cat)
+    );
+
+    const res = await fetch(
+      `${API_BASE}/user/my-list/platforms?${searchParams.toString()}`,
+      { headers: this.getHeaders() }
+    );
+
+    if (!res.ok) throw new Error('Failed to fetch platforms');
     return res.json();
   }
 }
