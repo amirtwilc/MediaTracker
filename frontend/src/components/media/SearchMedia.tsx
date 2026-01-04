@@ -37,12 +37,12 @@ export const SearchMedia: React.FC = () => {
   const [filterGenres, setFilterGenres] = useState<string[]>([]);
   const [filterPlatforms, setFilterPlatforms] = useState<string[]>([]);
 
-  // All available genres and platforms (from database)
-  const [allGenres, setAllGenres] = useState<Genre[]>([]);
-  const [allPlatforms, setAllPlatforms] = useState<Platform[]>([]);
+  // Available genres and platforms (filtered by search query and categories only)
+  const [availableGenres, setAvailableGenres] = useState<Genre[]>([]);
+  const [availablePlatforms, setAvailablePlatforms] = useState<Platform[]>([]);
 
   // Sorting - single sort only
-  const [sortConfig, setSortConfig] = useState<{key: string; direction: 'asc' | 'desc'} | null>(null);
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
   // Added items tracking
   const [editingAddedId, setEditingAddedId] = useState<number | null>(null);
@@ -67,7 +67,7 @@ export const SearchMedia: React.FC = () => {
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
-      loadGenresAndPlatforms();
+      loadAvailableFilters();
       handleSearch();
     }
   }, []);
@@ -78,6 +78,13 @@ export const SearchMedia: React.FC = () => {
       handleSearch();
     }
   }, [debouncedQuery, filterCategories, filterGenres, filterPlatforms]);
+
+  // Reload available filters when query or categories change (but NOT when genres/platforms change)
+  useEffect(() => {
+    if (!isInitialMount.current) {
+      loadAvailableFilters();
+    }
+  }, [debouncedQuery, filterCategories]);
 
   // Trigger search when sort changes
   useEffect(() => {
@@ -108,16 +115,25 @@ export const SearchMedia: React.FC = () => {
     }
   }, [currentPage]);
 
-  const loadGenresAndPlatforms = async () => {
+  const loadAvailableFilters = async () => {
     try {
+      const categories = filterCategories.length > 0 ? filterCategories : undefined;
+
       const [genresData, platformsData] = await Promise.all([
-        api.getAllGenres(),
-        api.getAllPlatforms(),
+        api.getAvailableMediaGenres({
+          query: debouncedQuery || undefined,
+          categories
+        }),
+        api.getAvailableMediaPlatforms({
+          query: debouncedQuery || undefined,
+          categories
+        }),
       ]);
-      setAllGenres(genresData);
-      setAllPlatforms(platformsData);
+
+      setAvailableGenres(genresData);
+      setAvailablePlatforms(platformsData);
     } catch (error) {
-      console.error('Failed to load genres/platforms', error);
+      console.error('Failed to load available filters', error);
     }
   };
 
@@ -138,11 +154,11 @@ export const SearchMedia: React.FC = () => {
     signal?: AbortSignal
   ): Promise<CachedPage> => {
     const genreIds = filterGenres.length > 0
-      ? allGenres.filter(g => filterGenres.includes(g.name)).map(g => g.id)
+      ? availableGenres.filter(g => filterGenres.includes(g.name)).map(g => g.id)
       : undefined;
 
     const platformIds = filterPlatforms.length > 0
-      ? allPlatforms.filter(p => filterPlatforms.includes(p.name)).map(p => p.id)
+      ? availablePlatforms.filter(p => filterPlatforms.includes(p.name)).map(p => p.id)
       : undefined;
 
     const categories = filterCategories.length > 0 ? filterCategories : undefined;
@@ -189,7 +205,7 @@ export const SearchMedia: React.FC = () => {
 
   const prefetchPage = async (pageNum: number) => {
     const cacheKey = getCacheKey(pageNum);
-    
+
     if (pageCache[cacheKey] || prefetchInProgress.has(pageNum)) {
       return;
     }
@@ -203,7 +219,7 @@ export const SearchMedia: React.FC = () => {
     try {
       const cursor = cursors[pageNum];
       const result = await fetchPage(pageNum, cursor);
-      
+
       setPageCache(prev => ({
         ...prev,
         [cacheKey]: result,
@@ -296,7 +312,7 @@ export const SearchMedia: React.FC = () => {
       setCursors([null]);
     }
     setPageCache({});
-    
+
     await loadPage(0);
   };
 
@@ -341,7 +357,7 @@ export const SearchMedia: React.FC = () => {
 
   const getSortIcon = (key: string) => {
     if (!sortConfig || sortConfig.key !== key) return null;
-    
+
     return (
       <span className="ml-1 text-blue-400 text-xs">
         {sortConfig.direction === 'asc' ? '↑' : '↓'}
@@ -367,15 +383,15 @@ export const SearchMedia: React.FC = () => {
         rating: undefined,
         comment: '',
       });
-      
+
       // Update the item in current results to show as added
-      setResults(prev => prev.map(item => 
+      setResults(prev => prev.map(item =>
         item.id === mediaItemId ? { ...item, inUserList: true } : item
       ));
-      
+
       // Clear cache to force refresh on next page change
       setPageCache({});
-      
+
       setErrorMessage('');
     } catch (error: any) {
       setErrorMessage(error.message || 'Failed to add item');
@@ -387,7 +403,7 @@ export const SearchMedia: React.FC = () => {
     try {
       const userList = await api.getMyMediaList(0, 1000);
       const listItem = userList.find(item => item.mediaItem.id === mediaItemId);
-      
+
       if (listItem) {
         await api.updateMyListItem(listItem.id, editState);
         setEditingAddedId(null);
@@ -464,11 +480,10 @@ export const SearchMedia: React.FC = () => {
                 <button
                   key={cat}
                   onClick={() => toggleFilter(filterCategories, setFilterCategories, cat)}
-                  className={`px-3 py-1 rounded text-sm ${
-                    filterCategories.includes(cat)
+                  className={`px-3 py-1 rounded text-sm ${filterCategories.includes(cat)
                       ? 'bg-blue-600 text-white'
                       : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                  }`}
+                    }`}
                 >
                   {cat}
                 </button>
@@ -476,19 +491,20 @@ export const SearchMedia: React.FC = () => {
             </div>
           </div>
 
-          {allGenres.length > 0 && (
+          {availableGenres.length > 0 && (
             <div>
-              <label className="block text-sm text-gray-300 mb-2">Genres (AND - show if ALL match):</label>
+              <label className="block text-sm text-gray-300 mb-2">
+                Genres (AND - show if ALL match) - {availableGenres.length} available:
+              </label>
               <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
-                {allGenres.map(genre => (
+                {availableGenres.map(genre => (
                   <button
                     key={genre.id}
                     onClick={() => toggleFilter(filterGenres, setFilterGenres, genre.name)}
-                    className={`px-3 py-1 rounded text-sm ${
-                      filterGenres.includes(genre.name)
+                    className={`px-3 py-1 rounded text-sm ${filterGenres.includes(genre.name)
                         ? 'bg-blue-600 text-white'
                         : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                    }`}
+                      }`}
                   >
                     {genre.name}
                   </button>
@@ -497,19 +513,20 @@ export const SearchMedia: React.FC = () => {
             </div>
           )}
 
-          {allPlatforms.length > 0 && (
+          {availablePlatforms.length > 0 && (
             <div>
-              <label className="block text-sm text-gray-300 mb-2">Platforms (AND - show if ALL match):</label>
+              <label className="block text-sm text-gray-300 mb-2">
+                Platforms (AND - show if ALL match) - {availablePlatforms.length} available:
+              </label>
               <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
-                {allPlatforms.map(platform => (
+                {availablePlatforms.map(platform => (
                   <button
                     key={platform.id}
                     onClick={() => toggleFilter(filterPlatforms, setFilterPlatforms, platform.name)}
-                    className={`px-3 py-1 rounded text-sm ${
-                      filterPlatforms.includes(platform.name)
+                    className={`px-3 py-1 rounded text-sm ${filterPlatforms.includes(platform.name)
                         ? 'bg-blue-600 text-white'
                         : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                    }`}
+                      }`}
                   >
                     {platform.name}
                   </button>
@@ -564,25 +581,25 @@ export const SearchMedia: React.FC = () => {
             <table className="w-full">
               <thead className="bg-gray-700 text-gray-300 text-sm">
                 <tr>
-                  <th 
+                  <th
                     className="px-4 py-3 text-left cursor-pointer hover:bg-gray-600"
                     onClick={() => handleSort('category')}
                   >
                     Category {getSortIcon('category')}
                   </th>
-                  <th 
+                  <th
                     className="px-4 py-3 text-left cursor-pointer hover:bg-gray-600"
                     onClick={() => handleSort('name')}
                   >
                     Name {getSortIcon('name')}
                   </th>
-                  <th 
+                  <th
                     className="px-4 py-3 text-left cursor-pointer hover:bg-gray-600"
                     onClick={() => handleSort('year')}
                   >
                     Year {getSortIcon('year')}
                   </th>
-                  <th 
+                  <th
                     className="px-4 py-3 text-left cursor-pointer hover:bg-gray-600"
                     onClick={() => handleSort('avgRating')}
                   >
@@ -719,7 +736,6 @@ export const SearchMedia: React.FC = () => {
               </tbody>
             </table>
           </div>
-
           {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-4">
@@ -756,4 +772,5 @@ export const SearchMedia: React.FC = () => {
       )}
     </div>
   );
+
 };

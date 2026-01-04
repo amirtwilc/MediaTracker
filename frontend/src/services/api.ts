@@ -572,6 +572,52 @@ class ApiClient {
     if (!res.ok) throw new Error('Failed to fetch platforms');
     return res.json();
   }
+
+  async getAvailableMediaGenres(params?: {
+  query?: string;
+  categories?: string[];
+}): Promise<Genre[]> {
+  const searchParams = new URLSearchParams();
+
+  if (params?.query) {
+    searchParams.append('query', params.query);
+  }
+
+  params?.categories?.forEach(cat =>
+    searchParams.append('categories', cat)
+  );
+
+  const res = await fetch(
+    `${API_BASE}/user/media-items/available-genres?${searchParams.toString()}`,
+    { headers: this.getHeaders() }
+  );
+
+  if (!res.ok) throw new Error('Failed to fetch genres');
+  return res.json();
+}
+
+  async getAvailableMediaPlatforms(params?: {
+    query?: string;
+    categories?: string[];
+  }): Promise<Platform[]> {
+    const searchParams = new URLSearchParams();
+
+    if (params?.query) {
+      searchParams.append('query', params.query);
+    }
+
+    params?.categories?.forEach(cat =>
+      searchParams.append('categories', cat)
+    );
+
+    const res = await fetch(
+      `${API_BASE}/user/media-items/available-platforms?${searchParams.toString()}`,
+      { headers: this.getHeaders() }
+    );
+
+    if (!res.ok) throw new Error('Failed to fetch platforms');
+    return res.json();
+  }
 }
 
 export const api = new ApiClient();

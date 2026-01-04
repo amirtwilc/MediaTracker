@@ -7,6 +7,8 @@ import com.amir.mediatracker.dto.request.FollowRequest;
 import com.amir.mediatracker.dto.request.UpdateMediaListRequest;
 import com.amir.mediatracker.dto.request.UpdateThresholdRequest;
 import com.amir.mediatracker.dto.response.*;
+import com.amir.mediatracker.entity.Genre;
+import com.amir.mediatracker.entity.Platform;
 import com.amir.mediatracker.security.dto.UserPrincipal;
 import com.amir.mediatracker.service.FollowService;
 import com.amir.mediatracker.service.MediaItemService;
@@ -21,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/media-tracker/user")
@@ -268,5 +271,39 @@ public class UserController {
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
         Long userId = userPrincipal.getId();
         return ResponseEntity.ok(userMediaListService.getUserPlatforms(userId, searchQuery, categories));
+    }
+
+    @LogAround
+    @GetMapping("/media-items/available-genres")
+    public ResponseEntity<List<GenreResponse>> getAvailableGenres(
+            @RequestParam(defaultValue = "") String query,
+            @RequestParam(required = false) Set<Category> categories
+    ) {
+        List<Genre> genres = mediaItemService.getAvailableGenres(query, categories);
+        return ResponseEntity.ok(
+                genres.stream()
+                        .map(g -> GenreResponse.builder()
+                                .id(g.getId())
+                                .name(g.getName())
+                                .build())
+                        .collect(Collectors.toList())
+        );
+    }
+
+    @LogAround
+    @GetMapping("/media-items/available-platforms")
+    public ResponseEntity<List<PlatformResponse>> getAvailablePlatforms(
+            @RequestParam(defaultValue = "") String query,
+            @RequestParam(required = false) Set<Category> categories
+    ) {
+        List<Platform> platforms = mediaItemService.getAvailablePlatforms(query, categories);
+        return ResponseEntity.ok(
+                platforms.stream()
+                        .map(p -> PlatformResponse.builder()
+                                .id(p.getId())
+                                .name(p.getName())
+                                .build())
+                        .collect(Collectors.toList())
+        );
     }
 }

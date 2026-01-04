@@ -5,7 +5,9 @@ import com.amir.mediatracker.dto.response.GenreResponse;
 import com.amir.mediatracker.dto.response.MediaItemResponse;
 import com.amir.mediatracker.dto.response.MediaSearchResponse;
 import com.amir.mediatracker.dto.response.PlatformResponse;
+import com.amir.mediatracker.entity.Genre;
 import com.amir.mediatracker.entity.MediaItem;
+import com.amir.mediatracker.entity.Platform;
 import com.amir.mediatracker.repository.MediaItemRepository;
 import com.amir.mediatracker.repository.UserMediaListRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -229,5 +231,15 @@ public class MediaItemService {
                 .createdAt(item.getCreatedAt())
                 .updatedAt(item.getUpdatedAt())
                 .build();
+    }
+
+    public List<Genre> getAvailableGenres(String query, Set<Category> categories) {
+        Set<Category> safeCategories = (categories == null || categories.isEmpty()) ? null : categories;
+        return mediaItemRepository.findDistinctGenresByFilters(query, safeCategories);
+    }
+
+    public List<Platform> getAvailablePlatforms(String query, Set<Category> categories) {
+        Set<Category> safeCategories = (categories == null || categories.isEmpty()) ? null : categories;
+        return mediaItemRepository.findDistinctPlatformsByFilters(query, safeCategories);
     }
 }

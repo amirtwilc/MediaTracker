@@ -1,7 +1,9 @@
 package com.amir.mediatracker.repository;
 
 import com.amir.mediatracker.dto.Category;
+import com.amir.mediatracker.entity.Genre;
 import com.amir.mediatracker.entity.MediaItem;
+import com.amir.mediatracker.entity.Platform;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -140,6 +142,30 @@ public interface MediaItemRepository extends JpaRepository<MediaItem, Long> {
         AND (:categories IS NULL OR m.category IN :categories)
         """)
     Long countSimple(
+            @Param("name") String name,
+            @Param("categories") Set<Category> categories
+    );
+
+    @Query("""
+        SELECT DISTINCT g FROM MediaItem m
+        JOIN m.genres g
+        WHERE LOWER(m.name) LIKE LOWER(CONCAT('%', :name, '%'))
+        AND (:categories IS NULL OR m.category IN :categories)
+        ORDER BY g.name ASC
+        """)
+    List<Genre> findDistinctGenresByFilters(
+            @Param("name") String name,
+            @Param("categories") Set<Category> categories
+    );
+
+    @Query("""
+        SELECT DISTINCT p FROM MediaItem m
+        JOIN m.platforms p
+        WHERE LOWER(m.name) LIKE LOWER(CONCAT('%', :name, '%'))
+        AND (:categories IS NULL OR m.category IN :categories)
+        ORDER BY p.name ASC
+        """)
+    List<Platform> findDistinctPlatformsByFilters(
             @Param("name") String name,
             @Param("categories") Set<Category> categories
     );
