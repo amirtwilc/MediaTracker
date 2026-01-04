@@ -39,6 +39,7 @@ export interface MediaItem {
   platforms: Platform[];
   createdAt?: string;
   updatedAt?: string;
+  inUserList?: boolean;
 }
 
 export interface UserMediaListItem {

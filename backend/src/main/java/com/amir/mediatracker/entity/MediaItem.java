@@ -59,4 +59,7 @@ public class MediaItem {
 
     @LastModifiedDate
     private LocalDateTime updatedAt;
+
+    @Transient
+    private Boolean inUserList = false;
 }

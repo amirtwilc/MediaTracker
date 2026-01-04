@@ -1,5 +1,5 @@
 # Media Tracker
-Track all the media that you experienced and want to experience in one place. Currently supports: Movies, TV Series, Video Games
+Track all the media that you experienced and want to experience in one place. Currently, supports: Movies, TV Series, Video Games
 
 ## Overview
 This app allows users to make a list of all the media they want to keep track on. 
@@ -57,8 +57,29 @@ Possible better solution:
 * There are already global APIs with huge databases, which could be easily queried and saved directly and automatically to the app's database.
 
 #### Platform inconsistency
+One of the fun features I wanted to add was the option to filter by platform (Netflix, Disney+, etc.). \
+So if a user says "I have Netflix, what can I watch?", then this app could help decide. \
+The problem is that each streaming service usually has different libraries based on one's current region. \
+Currently, the app does not support, nor have the ability, to differentiate between different regions. \
+Possible solutions:
+* - Assuming there are global APIs that has this information for all regions, this is probably the easiest approach.
+  - Since medias sometimes have expiration time until they are unavailable at current streaming service, APIs would be required to be fetched regularly or expiration dates will have to be maintained
+  - Each item will hold a ManyToMany relationship to region, as well as platform.
+  - Users will declare what is their region to filter unrelated regions.
+* Each user will manage its own "region". Platforms will remain as is today, where each item displays ALL known platforms, 
+regardless of region, and users will have the option to mark each item as "Not available to me". They will need the option to cancel mark as well.
 
 #### Items might be missing
+Even with the most reliable approach to maintain up-to-date items at all times, some items are destined to be missing. \
+Users might want the ability to suggest items, or at least maintain their own items. 
+
+Things to consider:
+
+- Need to decide on notification on these rated items: would followers still be interested in these less known items?
+- Ability to suggest means an Admin needs to review, but over using means work that is piling up. 
+- Maintaining own items means users might add garbage items or add items that already available.
+
+  The solution for both latter cases is probably to limit the new items allowed to suggest/save at each X days.
 
 
 

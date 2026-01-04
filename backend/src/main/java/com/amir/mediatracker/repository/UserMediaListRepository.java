@@ -148,4 +148,6 @@ public interface UserMediaListRepository extends JpaRepository<UserMediaList, Lo
             @Param("searchQuery") String searchQuery,
             @Param("categories") Set<Category> categories
     );
+
+    List<UserMediaList> findByUserIdAndMediaItemIdIn(Long userId, List<Long> mediaItemIds);
 }

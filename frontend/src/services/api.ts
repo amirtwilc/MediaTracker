@@ -64,7 +64,7 @@ class ApiClient {
   // Media Items (Cursor-based)
   async searchMediaItemsCursor(params: {
     query: string;
-    category?: string;
+    categories?: string[];
     genreIds?: number[];
     platformIds?: number[];
     cursorName?: string;
@@ -81,9 +81,9 @@ class ApiClient {
       limit: String(params.limit ?? 20),
     });
 
-    if (params.category) {
-      searchParams.append('category', params.category);
-    }
+    params.categories?.forEach(cat =>
+      searchParams.append('categories', cat)
+    );
 
     if (params.cursorName && params.cursorId !== undefined) {
       searchParams.append('cursorName', params.cursorName);
@@ -108,6 +108,51 @@ class ApiClient {
     return res.json();
   }
 
+  async searchMediaItemsSorted(params: {
+    query: string;
+    categories?: string[];
+    genreIds?: number[];
+    platformIds?: number[];
+    page?: number;
+    size?: number;
+    sortBy?: string;
+    sortDirection?: string;
+  }): Promise<{
+    content: MediaItem[];
+    totalPages: number;
+    totalElements: number;
+    number: number;
+    size: number;
+  }> {
+    const searchParams = new URLSearchParams({
+      query: params.query,
+      page: String(params.page ?? 0),
+      size: String(params.size ?? 20),
+      sortBy: params.sortBy ?? 'name',
+      sortDirection: params.sortDirection ?? 'ASC',
+    });
+
+    params.categories?.forEach(cat =>
+      searchParams.append('categories', cat)
+    );
+
+    params.genreIds?.forEach(id =>
+      searchParams.append('genreIds', String(id))
+    );
+
+    params.platformIds?.forEach(id =>
+      searchParams.append('platformIds', String(id))
+    );
+
+    const res = await fetch(
+      `${API_BASE}/user/media-items/search-sorted?${searchParams.toString()}`,
+      { headers: this.getHeaders() }
+    );
+
+    if (!res.ok) throw new Error('Search failed');
+
+    return res.json();
+  }
 
   // User Media List
   async getMyMediaList(page = 0, size = 100): Promise<UserMediaListItem[]> {

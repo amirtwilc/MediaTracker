@@ -46,23 +46,47 @@ public class UserController {
             @RequestParam(required = false) Set<Long> platformIds,
             @RequestParam(required = false) String cursorName,
             @RequestParam(required = false) Long cursorId,
-            @RequestParam(defaultValue = "20") int limit
+            @RequestParam(defaultValue = "20") int limit,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
-        // For now, if multiple categories are provided, we'll need to handle this differently
-        // Let's pass null category if more than one is selected, and filter client-side
-        Category singleCategory = (categories != null && categories.size() == 1)
-                ? categories.iterator().next()
-                : null;
-
         return ResponseEntity.ok(
                 mediaItemService.searchMediaItemsCursor(
+                        userPrincipal.getId(),
                         query,
-                        singleCategory,
+                        categories,
                         genreIds,
                         platformIds,
                         cursorName,
                         cursorId,
                         limit
+                )
+        );
+    }
+
+    @LogAround
+    @GetMapping("/media-items/search-sorted")
+    public ResponseEntity<Page<MediaItemResponse>> searchMediaItemsSorted(
+            @RequestParam String query,
+            @RequestParam(required = false) Set<Category> categories,
+            @RequestParam(required = false) Set<Long> genreIds,
+            @RequestParam(required = false) Set<Long> platformIds,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "name") String sortBy,
+            @RequestParam(defaultValue = "ASC") String sortDirection,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        return ResponseEntity.ok(
+                mediaItemService.searchMediaItemsSorted(
+                        userPrincipal.getId(),
+                        query,
+                        categories,
+                        genreIds,
+                        platformIds,
+                        page,
+                        size,
+                        sortBy,
+                        sortDirection
                 )
         );
     }

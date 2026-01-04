@@ -20,4 +20,5 @@ public class MediaItemResponse {
     private Set<PlatformResponse> platforms;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private Boolean inUserList;
 }
