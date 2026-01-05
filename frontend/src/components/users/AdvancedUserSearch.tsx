@@ -19,9 +19,17 @@ interface AdvancedUserSearchProps {
 export const AdvancedUserSearch: React.FC<AdvancedUserSearchProps> = ({ onViewUser }) => {
     // Search state
     const [searchQuery, setSearchQuery] = useState('');
-    const [searchResults, setSearchResults] = useState<MediaItem[]>([]);
+    const [mediaSearchResults, setMediaSearchResults] = useState<MediaItem[]>([]);
     const [searchLoading, setSearchLoading] = useState(false);
     const [hasSearched, setHasSearched] = useState(false);
+
+    // Media pagination state
+    const [mediaCursors, setMediaCursors] = useState<Array<{ name: string; id: number } | null>>([null]);
+    const [mediaCurrentPage, setMediaCurrentPage] = useState(0);
+    const [mediaTotalPages, setMediaTotalPages] = useState(0);
+    const [mediaTotalCount, setMediaTotalCount] = useState(0);
+    const [mediaHasNextPage, setMediaHasNextPage] = useState(false);
+    const [mediaHasPrevPage, setMediaHasPrevPage] = useState(false);
 
     // Selected items with rating criteria
     const [selectedCriteria, setSelectedCriteria] = useState<RatingCriteria[]>([]);
@@ -48,16 +56,57 @@ export const AdvancedUserSearch: React.FC<AdvancedUserSearchProps> = ({ onViewUs
     const resultsRef = React.useRef<HTMLDivElement>(null);
 
     const handleSearchMedia = async () => {
+        setMediaCurrentPage(0);
+        setMediaCursors([null]);
+        await loadMediaPage(0, null);
+    };
+
+    const loadMediaPage = async (pageNum: number, cursor: { name: string; id: number } | null) => {
         setSearchLoading(true);
         setHasSearched(true);
 
         try {
-            const data = await api.searchMediaItems(searchQuery || '', undefined, 0, 20);
-            setSearchResults(data);
+            const response = await api.searchMediaItemsCursor({
+                query: searchQuery || '',
+                cursorName: cursor?.name,
+                cursorId: cursor?.id,
+                limit: 20,
+            });
+            
+            setMediaSearchResults(response.items);
+            setMediaHasNextPage(response.hasMore);
+            setMediaHasPrevPage(pageNum > 0);
+            setMediaCurrentPage(pageNum);
+            setMediaTotalCount(response.totalCount);
+            setMediaTotalPages(Math.ceil(response.totalCount / 20));
+
+            // Store next cursor if available
+            if (response.hasMore && response.nextCursor) {
+                setMediaCursors(prev => {
+                    const newCursors = [...prev];
+                    if (pageNum + 1 >= newCursors.length) {
+                        newCursors.push(response.nextCursor!);
+                    }
+                    return newCursors;
+                });
+            }
         } catch (error) {
             console.error('Search failed', error);
+            setMediaSearchResults([]);
         } finally {
             setSearchLoading(false);
+        }
+    };
+
+    const handleMediaNextPage = () => {
+        if (mediaHasNextPage && mediaCurrentPage + 1 < mediaCursors.length) {
+            loadMediaPage(mediaCurrentPage + 1, mediaCursors[mediaCurrentPage + 1]);
+        }
+    };
+
+    const handleMediaPrevPage = () => {
+        if (mediaCurrentPage > 0) {
+            loadMediaPage(mediaCurrentPage - 1, mediaCursors[mediaCurrentPage - 1]);
         }
     };
 
@@ -222,49 +271,79 @@ export const AdvancedUserSearch: React.FC<AdvancedUserSearchProps> = ({ onViewUs
                     <div className="overflow-x-auto">
                         {searchLoading ? (
                             <div className="text-center py-8 text-gray-400">Loading...</div>
-                        ) : searchResults.length === 0 ? (
+                        ) : mediaSearchResults.length === 0 ? (
                             <div className="text-center py-8 text-gray-400">No results found.</div>
                         ) : (
-                            <table className="w-full">
-                                <thead className="bg-gray-700 text-gray-300 text-sm">
-                                    <tr>
-                                        <th className="px-4 py-3 text-left">Category</th>
-                                        <th className="px-4 py-3 text-left">Name</th>
-                                        <th className="px-4 py-3 text-left">Year</th>
-                                        <th className="px-4 py-3 text-left">Genre</th>
-                                        <th className="px-4 py-3 text-right">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="text-sm">
-                                    {searchResults.map((item) => {
-                                        const alreadyAdded = selectedCriteria.some(c => c.mediaItem.id === item.id);
-                                        return (
-                                            <tr key={item.id} className="border-b border-gray-700 hover:bg-gray-800">
-                                                <td className="px-4 py-3">
-                                                    <span className={`px-2 py-1 rounded text-xs ${getCategoryColor(item.category)} text-white`}>
-                                                        {item.category}
-                                                    </span>
-                                                </td>
-                                                <td className="px-4 py-3 text-white font-medium">{item.name}</td>
-                                                <td className="px-4 py-3 text-gray-300">{item.year || '-'}</td>
-                                                <td className="px-4 py-3 text-gray-300">
-                                                    {item.genres.map(g => g.name).join(', ')}
-                                                </td>
-                                                <td className="px-4 py-3 text-right">
-                                                    <button
-                                                        onClick={() => handleAddItem(item)}
-                                                        disabled={alreadyAdded || selectedCriteria.length >= MAX_ITEMS}
-                                                        className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 ml-auto"
-                                                    >
-                                                        <Plus size={14} />
-                                                        {alreadyAdded ? 'Added' : 'Add'}
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
+                            <>
+                                <table className="w-full">
+                                    <thead className="bg-gray-700 text-gray-300 text-sm">
+                                        <tr>
+                                            <th className="px-4 py-3 text-left">Category</th>
+                                            <th className="px-4 py-3 text-left">Name</th>
+                                            <th className="px-4 py-3 text-left">Year</th>
+                                            <th className="px-4 py-3 text-left">Genre</th>
+                                            <th className="px-4 py-3 text-right">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="text-sm">
+                                        {mediaSearchResults.map((item) => {
+                                            const alreadyAdded = selectedCriteria.some(c => c.mediaItem.id === item.id);
+                                            return (
+                                                <tr key={item.id} className="border-b border-gray-700 hover:bg-gray-800">
+                                                    <td className="px-4 py-3">
+                                                        <span className={`px-2 py-1 rounded text-xs ${getCategoryColor(item.category)} text-white`}>
+                                                            {item.category}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-white font-medium">{item.name}</td>
+                                                    <td className="px-4 py-3 text-gray-300">{item.year || '-'}</td>
+                                                    <td className="px-4 py-3 text-gray-300">
+                                                        {item.genres.map(g => g.name).join(', ')}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right">
+                                                        <button
+                                                            onClick={() => handleAddItem(item)}
+                                                            disabled={alreadyAdded || selectedCriteria.length >= MAX_ITEMS}
+                                                            className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 ml-auto"
+                                                        >
+                                                            <Plus size={14} />
+                                                            {alreadyAdded ? 'Added' : 'Add'}
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+
+                                {/* Media Pagination */}
+                                {mediaTotalPages > 1 && (
+                                    <div className="flex items-center justify-center gap-4 mt-4">
+                                        <button
+                                            onClick={handleMediaPrevPage}
+                                            disabled={!mediaHasPrevPage || searchLoading}
+                                            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            Previous
+                                        </button>
+                                        <span className="text-gray-300">
+                                            Page {mediaCurrentPage + 1} of {mediaTotalPages}
+                                            {mediaTotalCount > 0 && (
+                                                <span className="text-xs text-gray-400 ml-2">
+                                                    ({mediaTotalCount} items)
+                                                </span>
+                                            )}
+                                        </span>
+                                        <button
+                                            onClick={handleMediaNextPage}
+                                            disabled={!mediaHasNextPage || searchLoading}
+                                            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            Next
+                                        </button>
+                                    </div>
+                                )}
+                            </>
                         )}
                     </div>
                 )}
