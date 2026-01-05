@@ -8,10 +8,16 @@ import { ConfirmModal } from '../common/ConfirmModal';
 export const UpdateMediaItem: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<MediaItem[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+
+  // Cursor pagination
+  const [cursors, setCursors] = useState<Array<{ name: string; id: number } | null>>([null]);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [hasPrevPage, setHasPrevPage] = useState(false);
 
   // Edit mode
   const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null);
@@ -30,8 +36,7 @@ export const UpdateMediaItem: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
-    loadGenresAndPlatforms();
-    loadAllItems();
+    loadPage(0, null);
   }, []);
 
   useEffect(() => {
@@ -40,6 +45,61 @@ export const UpdateMediaItem: React.FC = () => {
       return () => clearTimeout(timer);
     }
   }, [successMessage]);
+
+  const loadPage = async (pageNum: number, cursor: { name: string; id: number } | null) => {
+    setSearchLoading(true);
+    try {
+      const response = await api.searchMediaItemsCursor({
+        query: searchQuery,
+        cursorName: cursor?.name,
+        cursorId: cursor?.id,
+        limit: 20,
+      });
+
+      setSearchResults(response.items);
+      setHasNextPage(response.hasMore);
+      setHasPrevPage(pageNum > 0);
+      setCurrentPage(pageNum);
+      setTotalCount(response.totalCount);
+      setTotalPages(Math.ceil(response.totalCount / 20));
+
+      // Store next cursor if available
+      if (response.hasMore && response.nextCursor) {
+        setCursors(prev => {
+          const newCursors = [...prev];
+          if (pageNum + 1 >= newCursors.length) {
+            newCursors.push(response.nextCursor!);
+          }
+          return newCursors;
+        });
+      }
+
+      setHasSearched(true);
+    } catch (error) {
+      console.error('Failed to load items', error);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  const handleSearch = () => {
+    // Reset pagination state
+    setCurrentPage(0);
+    setCursors([null]);
+    loadPage(0, null);
+  };
+
+  const handleNextPage = () => {
+    if (hasNextPage && currentPage + 1 < cursors.length) {
+      loadPage(currentPage + 1, cursors[currentPage + 1]);
+    }
+  };
+
+  const handlePrevPage = () => {
+    if (currentPage > 0) {
+      loadPage(currentPage - 1, cursors[currentPage - 1]);
+    }
+  };
 
   const loadGenresAndPlatforms = async () => {
     try {
@@ -54,41 +114,13 @@ export const UpdateMediaItem: React.FC = () => {
     }
   };
 
-  const loadAllItems = async () => {
-    setLoading(true);
-    try {
-      const data = await api.searchMediaItems('', undefined, 0, 200);
-      setSearchResults(data);
-      setTotalPages(Math.ceil(data.length / 20));
-      setCurrentPage(0);
-      setHasSearched(true);
-    } catch (error) {
-      console.error('Failed to load items', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSearch = async () => {
-    setLoading(true);
-    setHasSearched(true);
-    try {
-      const data = await api.searchMediaItems(searchQuery, undefined, 0, 200);
-      setSearchResults(data);
-      setTotalPages(Math.ceil(data.length / 20));
-      setCurrentPage(0);
-    } catch (error) {
-      console.error('Search failed', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleChooseItem = (item: MediaItem) => {
     setSelectedItem(item);
     setYear(item.year?.toString() || '');
     setSelectedGenres(item.genres.map(g => g.id));
     setSelectedPlatforms(item.platforms.map(p => p.id));
+    // Load genres and platforms only when selecting an item
+    loadGenresAndPlatforms();
   };
 
   const handleUpdate = async () => {
@@ -105,7 +137,8 @@ export const UpdateMediaItem: React.FC = () => {
 
       setSuccessMessage('Item updated successfully!');
       setSelectedItem(null);
-      loadAllItems();
+      // Reload current page
+      loadPage(currentPage, cursors[currentPage]);
     } catch (error: any) {
       alert(error.message || 'Failed to update item');
     }
@@ -119,7 +152,10 @@ export const UpdateMediaItem: React.FC = () => {
       setSuccessMessage('Item deleted successfully!');
       setSelectedItem(null);
       setDeleteConfirm(false);
-      loadAllItems();
+      // Reload from first page after deletion
+      setCurrentPage(0);
+      setCursors([null]);
+      loadPage(0, null);
     } catch (error: any) {
       alert(error.message || 'Failed to delete item');
       setDeleteConfirm(false);
@@ -132,9 +168,6 @@ export const UpdateMediaItem: React.FC = () => {
     setSelectedGenres([]);
     setSelectedPlatforms([]);
   };
-
-  // Pagination
-  const paginatedResults = searchResults.slice(currentPage * 20, (currentPage + 1) * 20);
 
   if (selectedItem) {
     return (
@@ -280,86 +313,94 @@ export const UpdateMediaItem: React.FC = () => {
         />
         <button
           onClick={handleSearch}
-          disabled={loading}
+          disabled={searchLoading}
           className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium disabled:opacity-50"
         >
           <Search size={20} />
         </button>
       </div>
 
-      {loading ? (
-        <div className="text-center py-8 text-gray-400">Loading...</div>
-      ) : searchResults.length === 0 && hasSearched ? (
-        <div className="text-center py-8 text-gray-400">No items found.</div>
-      ) : (
-        <>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-700 text-gray-300 text-sm">
-                <tr>
-                  <th className="px-4 py-3 text-left">Category</th>
-                  <th className="px-4 py-3 text-left">Name</th>
-                  <th className="px-4 py-3 text-left">Year</th>
-                  <th className="px-4 py-3 text-left">Genres</th>
-                  <th className="px-4 py-3 text-left">Platforms</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="text-sm">
-                {paginatedResults.map((item) => (
-                  <tr key={item.id} className="border-b border-gray-700 hover:bg-gray-800">
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-1 rounded text-xs ${getCategoryColor(item.category)} text-white`}>
-                        {item.category}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-white font-medium">{item.name}</td>
-                    <td className="px-4 py-3 text-gray-300">{item.year || '-'}</td>
-                    <td className="px-4 py-3 text-gray-300 text-sm">
-                      {item.genres.map(g => g.name).join(', ')}
-                    </td>
-                    <td className="px-4 py-3 text-gray-300 text-sm">
-                      {item.platforms.map(p => p.name).join(', ')}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => handleChooseItem(item)}
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium"
-                      >
-                        Choose
-                      </button>
-                    </td>
+      {/* Media Search Results */}
+      {hasSearched && (
+        <div className="overflow-x-auto">
+          {searchLoading && searchResults.length === 0 ? (
+            <div className="text-center py-8 text-gray-400">Loading...</div>
+          ) : searchResults.length === 0 ? (
+            <div className="text-center py-8 text-gray-400">No results found.</div>
+          ) : (
+            <>
+              <table className="w-full">
+                <thead className="bg-gray-700 text-gray-300 text-sm">
+                  <tr>
+                    <th className="px-4 py-3 text-left">Category</th>
+                    <th className="px-4 py-3 text-left">Name</th>
+                    <th className="px-4 py-3 text-left">Year</th>
+                    <th className="px-4 py-3 text-left">Genres</th>
+                    <th className="px-4 py-3 text-left">Platforms</th>
+                    <th className="px-4 py-3 text-right">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="text-sm">
+                  {searchResults.map((item) => (
+                    <tr key={item.id} className="border-b border-gray-700 hover:bg-gray-800">
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-1 rounded text-xs ${getCategoryColor(item.category)} text-white`}>
+                          {item.category}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-white font-medium">{item.name}</td>
+                      <td className="px-4 py-3 text-gray-300">{item.year || '-'}</td>
+                      <td className="px-4 py-3 text-gray-300 text-sm">
+                        {item.genres.map(g => g.name).join(', ')}
+                      </td>
+                      <td className="px-4 py-3 text-gray-300 text-sm">
+                        {item.platforms.map(p => p.name).join(', ')}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          onClick={() => handleChooseItem(item)}
+                          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium"
+                        >
+                          Choose
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-4 mt-4">
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
-                disabled={currentPage === 0}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                <ChevronLeft size={20} />
-                Previous
-              </button>
-              <span className="text-gray-300">
-                Page {currentPage + 1} of {totalPages}
-              </span>
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(totalPages - 1, prev + 1))}
-                disabled={currentPage >= totalPages - 1}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                Next
-                <ChevronRight size={20} />
-              </button>
-            </div>
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-4 mt-4">
+                  <button
+                    onClick={handlePrevPage}
+                    disabled={!hasPrevPage || searchLoading}
+                    className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    <ChevronLeft size={20} />
+                    Previous
+                  </button>
+                  <span className="text-gray-300">
+                    Page {currentPage + 1} of {totalPages}
+                    {totalCount > 0 && (
+                      <span className="text-xs text-gray-400 ml-2">
+                        ({totalCount} items)
+                      </span>
+                    )}
+                  </span>
+                  <button
+                    onClick={handleNextPage}
+                    disabled={!hasNextPage || searchLoading}
+                    className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    Next
+                    <ChevronRight size={20} />
+                  </button>
+                </div>
+              )}
+            </>
           )}
-        </>
+        </div>
       )}
     </div>
   );
