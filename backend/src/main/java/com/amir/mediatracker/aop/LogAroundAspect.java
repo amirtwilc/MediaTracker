@@ -1,50 +1,55 @@
 package com.amir.mediatracker.aop;
 
 import lombok.extern.slf4j.Slf4j;
-import org.aspectj.lang.JoinPoint;
-import org.aspectj.lang.annotation.*;
+import org.aspectj.lang.ProceedingJoinPoint;
+import org.aspectj.lang.annotation.Around;
+import org.aspectj.lang.annotation.Aspect;
 import org.springframework.stereotype.Component;
 
 import java.util.Arrays;
 
+/**
+ * Aspect that logs method invocation details (arguments, return value, and exceptions)
+ * for methods annotated with {@link LogAround}.
+ *
+ * <p><strong>Warning:</strong> Be cautious when annotating methods that handle
+ * sensitive data (e.g. credentials, tokens, PII), as arguments and return values
+ * may be logged.
+ */
 @Slf4j
 @Aspect
 @Component
 public class LogAroundAspect {
 
-    // 🎯 Pointcut: Adjust the package to match where your methods are
-    @Pointcut("@annotation(com.amir.mediatracker.aop.LogAround)")
-    public void serviceMethods() {}
-
-    @Before("serviceMethods()")
-    public void logRequest(JoinPoint joinPoint) {
-        String className = joinPoint.getTarget().getClass().getSimpleName();
-        String methodName = joinPoint.getSignature().getName();
-        Object[] args = joinPoint.getArgs();
+    @Around("@annotation(com.amir.mediatracker.aop.LogAround)")
+    public Object logExecution(ProceedingJoinPoint pjp) throws Throwable {
+        String className = pjp.getTarget().getClass().getSimpleName();
+        String methodName = pjp.getSignature().getName();
+        Object[] args = pjp.getArgs();
 
         if (args == null || args.length == 0) {
-            log.info("{}::{}() called with no arguments", className, methodName);
+            log.info("{}::{}() started with no arguments", className, methodName);
         } else {
-            log.info("{}::{}() called with args: {}", className, methodName, Arrays.toString(args));
+            log.info("{}::{}() started with args: {}", className, methodName, Arrays.toString(args));
         }
-    }
 
-    @AfterReturning(pointcut = "serviceMethods()", returning = "result")
-    public void logResponse(JoinPoint joinPoint, Object result) {
-        String className = joinPoint.getTarget().getClass().getSimpleName();
-        String methodName = joinPoint.getSignature().getName();
+        long start = System.currentTimeMillis();
+        try {
+            Object result = pjp.proceed();
+            long duration = System.currentTimeMillis() - start;
 
-        if (result == null) {
-            log.info("{}::{}() returned no response (null)", className, methodName);
-        } else {
-            log.info("{}::{}() returned: {}", className, methodName, result);
+
+            if (result == null) {
+                log.info("{}::{}({} ms) returned no response (null)", className, duration, methodName);
+            } else {
+                log.info("{}::{}({} ms) returned: {}", className, methodName, duration, result);
+            }
+
+            return result;
+        } catch (Throwable ex) {
+            long duration = System.currentTimeMillis() - start;
+            log.error("Exception in {}::{} ({} ms)", className, methodName, duration, ex);
+            throw ex;
         }
-    }
-
-    @AfterThrowing(pointcut = "serviceMethods()", throwing = "ex")
-    public void logException(JoinPoint joinPoint, Throwable ex) {
-        String className = joinPoint.getTarget().getClass().getSimpleName();
-        String methodName = joinPoint.getSignature().getName();
-        log.error("Exception in {}::{} - {}", className, methodName, ex.getMessage(), ex);
     }
 }

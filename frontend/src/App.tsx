@@ -59,7 +59,14 @@ const App: React.FC = () => {
       {/* Header */}
       <header className="bg-gray-800 border-b border-gray-700">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Media Tracker</h1>
+          <div className="flex items-center gap-3">
+            <img
+              src="/logo.png"
+              alt="Media Tracker Logo"
+              className="h-8 w-8"
+            />
+            <h1 className="text-2xl font-bold">Media Tracker</h1>
+          </div>
           <div className="flex items-center gap-4">
             <span className="text-gray-400">
               {user.username}
@@ -95,11 +102,10 @@ const App: React.FC = () => {
                 setActiveView('myList');
                 setSelectedUserId(null);
               }}
-              className={`px-4 py-3 font-medium whitespace-nowrap ${
-                activeView === 'myList'
+              className={`px-4 py-3 font-medium whitespace-nowrap ${activeView === 'myList'
                   ? 'text-white border-b-2 border-blue-500'
                   : 'text-gray-400 hover:text-white'
-              }`}
+                }`}
             >
               My List
             </button>
@@ -108,11 +114,10 @@ const App: React.FC = () => {
                 setActiveView('search');
                 setSelectedUserId(null);
               }}
-              className={`px-4 py-3 font-medium whitespace-nowrap ${
-                activeView === 'search'
+              className={`px-4 py-3 font-medium whitespace-nowrap ${activeView === 'search'
                   ? 'text-white border-b-2 border-blue-500'
                   : 'text-gray-400 hover:text-white'
-              }`}
+                }`}
             >
               Search Media
             </button>
@@ -121,11 +126,10 @@ const App: React.FC = () => {
                 setActiveView('follow');
                 setSelectedUserId(null);
               }}
-              className={`px-4 py-3 font-medium whitespace-nowrap ${
-                activeView === 'follow'
+              className={`px-4 py-3 font-medium whitespace-nowrap ${activeView === 'follow'
                   ? 'text-white border-b-2 border-blue-500'
                   : 'text-gray-400 hover:text-white'
-              }`}
+                }`}
             >
               Follow
             </button>
@@ -135,11 +139,10 @@ const App: React.FC = () => {
                   setActiveView('admin');
                   setSelectedUserId(null);
                 }}
-                className={`px-4 py-3 font-medium whitespace-nowrap ${
-                  activeView === 'admin'
+                className={`px-4 py-3 font-medium whitespace-nowrap ${activeView === 'admin'
                     ? 'text-white border-b-2 border-blue-500'
                     : 'text-gray-400 hover:text-white'
-                }`}
+                  }`}
               >
                 Admin Panel
               </button>
@@ -149,11 +152,10 @@ const App: React.FC = () => {
                 setActiveView('users');
                 setSelectedUserId(null);
               }}
-              className={`px-4 py-3 font-medium whitespace-nowrap ${
-                activeView === 'users' && !selectedUserId
+              className={`px-4 py-3 font-medium whitespace-nowrap ${activeView === 'users' && !selectedUserId
                   ? 'text-white border-b-2 border-blue-500'
                   : 'text-gray-400 hover:text-white'
-              }`}
+                }`}
             >
               Users
             </button>
@@ -162,11 +164,10 @@ const App: React.FC = () => {
                 setActiveView('settings');
                 setSelectedUserId(null);
               }}
-              className={`px-4 py-3 font-medium whitespace-nowrap ${
-                activeView === 'settings'
+              className={`px-4 py-3 font-medium whitespace-nowrap ${activeView === 'settings'
                   ? 'text-white border-b-2 border-blue-500'
                   : 'text-gray-400 hover:text-white'
-              }`}
+                }`}
             >
               Settings
             </button>
@@ -185,26 +186,24 @@ const App: React.FC = () => {
             <div className="flex gap-2 border-b border-gray-700">
               <button
                 onClick={() => setUsersSubView('search')}
-                className={`px-4 py-2 font-medium ${
-                  usersSubView === 'search'
+                className={`px-4 py-2 font-medium ${usersSubView === 'search'
                     ? 'text-white border-b-2 border-blue-500'
                     : 'text-gray-400 hover:text-white'
-                }`}
+                  }`}
               >
                 User Search
               </button>
               <button
                 onClick={() => setUsersSubView('advanced')}
-                className={`px-4 py-2 font-medium ${
-                  usersSubView === 'advanced'
+                className={`px-4 py-2 font-medium ${usersSubView === 'advanced'
                     ? 'text-white border-b-2 border-blue-500'
                     : 'text-gray-400 hover:text-white'
-                }`}
+                  }`}
               >
                 Advanced Search
               </button>
             </div>
-            
+
             {usersSubView === 'search' ? (
               <UserSearch onViewUser={handleViewUser} />
             ) : (

@@ -3,6 +3,7 @@ import { Upload, X, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { Genre, Platform } from '../../types';
 import { api } from '../../services/api';
 import { UpdateMediaItem } from './UpdateMediaItem';
+import { log } from 'console';
 
 export const AdminPanel: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'create' | 'upload' | 'update'>('create');
@@ -97,7 +98,7 @@ export const AdminPanel: React.FC = () => {
 
     try {
       const response = await api.uploadCSV(file);
-      setJobId(response.jobExecutionId);
+      setJobId(response.correlationId);
       setJobStatus(null);
       setUploadProgress({ 
         show: true, 
@@ -112,7 +113,7 @@ export const AdminPanel: React.FC = () => {
       // Start polling for status
       const pollStatus = async () => {
         try {
-          const status = await api.getJobStatus(response.jobExecutionId);
+          const status = await api.getJobStatus(response.correlationId);
           setJobStatus(status);
 
           // Calculate progress

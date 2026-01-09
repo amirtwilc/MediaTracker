@@ -1,6 +1,7 @@
 package com.amir.mediatracker.controller;
 
 import com.amir.mediatracker.aop.LogAround;
+import com.amir.mediatracker.batch.constant.JobParameterNames;
 import com.amir.mediatracker.dto.request.GenreRequest;
 import com.amir.mediatracker.dto.request.MediaItemRequest;
 import com.amir.mediatracker.dto.request.PlatformRequest;
@@ -9,12 +10,8 @@ import com.amir.mediatracker.service.AdminService;
 import com.amir.mediatracker.service.AsyncBatchService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.batch.core.Job;
-import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.JobParameters;
 import org.springframework.batch.core.JobParametersBuilder;
-import org.springframework.batch.core.launch.JobLauncher;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -25,9 +22,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.LocalDateTime;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 
 @RestController
 @RequestMapping("/media-tracker/admin")
@@ -36,56 +31,49 @@ import java.util.concurrent.CompletableFuture;
 public class AdminController {
 
     private final AdminService adminService;
-    private final JobLauncher jobLauncher;
-    private final Job importMediaItemJob;
     private final AsyncBatchService asyncBatchService;
 
-    // Upload CSV and trigger Spring Batch job
+    /**
+     * Handles upload of CSV file and activated Spring Batch.
+     * Job is performed asynchronously for non-blocking behavior.
+     * A unique correlationId key is generated and will be mapped later to the jobExecutionId
+     * @param file The CSV file to parse
+     * @return correlationId and status
+     * @throws IOException if file was not able to be temporarily saved to system
+     */
     @LogAround
     @PostMapping("/media-items/import-csv")
-    public ResponseEntity<ImportStatusResponse> importCSV(
-            @RequestParam("file") MultipartFile file) throws Exception {
+    public ResponseEntity<ImportStatusResponse> importCsv(
+            @RequestParam("file") MultipartFile file) throws IOException {
 
-        // Save file temporarily
         String tempFilePath = saveTempFile(file);
 
-        // Launch batch job asynchronously
-        JobParameters jobParameters = new JobParametersBuilder()
-                .addString("filePath", tempFilePath)
-                .addLong("startTime", System.currentTimeMillis())
+        long correlationId = System.currentTimeMillis();
+
+        JobParameters params = new JobParametersBuilder()
+                .addString(JobParameterNames.FILE_PATH, tempFilePath)
                 .toJobParameters();
 
-        // Start async execution
-        CompletableFuture<JobExecution> futureExecution =
-                asyncBatchService.runImportJob(jobParameters);
+        asyncBatchService.startImportJob(correlationId, params);
 
-        // Wait briefly to get the job ID (max 2 seconds)
-        try {
-            JobExecution execution = futureExecution.get(2, java.util.concurrent.TimeUnit.SECONDS);
-
-            ImportStatusResponse response = new ImportStatusResponse();
-            response.setJobExecutionId(execution.getId());
-            response.setStatus(execution.getStatus().toString());
-            response.setStartTime(execution.getStartTime());
-
-            return ResponseEntity.ok(response);
-        } catch (java.util.concurrent.TimeoutException e) {
-            // Job hasn't started yet, return a temporary response
-            ImportStatusResponse response = new ImportStatusResponse();
-            response.setJobExecutionId(jobParameters.getLong("startTime"));
-            response.setStatus("STARTING");
-            response.setStartTime(LocalDateTime.now());
-
-            return ResponseEntity.ok(response);
-        }
+        return ResponseEntity.ok(
+                ImportStatusResponse.builder()
+                        .correlationId(correlationId)
+                        .status("STARTING")
+                        .build()
+        );
     }
 
-    // Check batch job status
+    /**
+     * Checks the status of a started job
+     * @param correlationId The key given by /import-csv endpoint
+     * @return The job current status, along with the amount of reads, writes and skips performed
+     */
     @LogAround
-    @GetMapping("/media-items/import-status/{jobExecutionId}")
+    @GetMapping("/media-items/import-status/{correlationId}")
     public ResponseEntity<JobStatusResponse> getJobStatus(
-            @PathVariable Long jobExecutionId) {
-        return ResponseEntity.ok(adminService.getJobStatus(jobExecutionId));
+            @PathVariable Long correlationId) {
+        return ResponseEntity.ok(adminService.getJobStatus(correlationId));
     }
 
     // Get all genres

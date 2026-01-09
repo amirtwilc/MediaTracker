@@ -80,3 +80,8 @@ logging:
     org.springframework.kafka: INFO
     org.hibernate.SQL: INFO
 
+app:
+  batch:
+    chunk-size: 10
+    skip-limit: 100
+

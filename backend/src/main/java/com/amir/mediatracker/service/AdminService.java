@@ -1,5 +1,7 @@
 package com.amir.mediatracker.service;
 
+import com.amir.mediatracker.batch.dto.StepCount;
+import com.amir.mediatracker.batch.util.BatchUtil;
 import com.amir.mediatracker.dto.request.GenreRequest;
 import com.amir.mediatracker.dto.request.MediaItemRequest;
 import com.amir.mediatracker.dto.request.PlatformRequest;
@@ -18,7 +20,6 @@ import com.amir.mediatracker.repository.PlatformRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.JobExecution;
-import org.springframework.batch.core.StepExecution;
 import org.springframework.batch.core.explore.JobExplorer;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -170,50 +171,44 @@ public class AdminService {
         return items.map(this::mapToResponse);
     }
 
-    public JobStatusResponse getJobStatus(Long jobExecutionId) {
-        JobExecution jobExecution = null;
-        
-        // If the ID looks like a timestamp (large number), try to find the actual job execution ID
-        if (jobExecutionId > 1000000000000L) {
-            // This is likely a timestamp (startTime), get the actual job execution ID
-            Long actualJobExecutionId = asyncBatchService.getJobExecutionIdByStartTime(jobExecutionId);
-            if (actualJobExecutionId != null) {
-                jobExecutionId = actualJobExecutionId;
-                log.debug("Resolved startTime {} to job execution ID {}", jobExecutionId, actualJobExecutionId);
-            }
-        }
-        
-        // Always query JobExplorer for the latest status (not in-memory cache)
-        // This ensures we get real-time updates as the job progresses
-        jobExecution = jobExplorer.getJobExecution(jobExecutionId);
+    /**
+     * Retrieves the current job status, along with the amount of reads, writes and skips performed
+     * @param correlationId The key that maps to the jobExecutionId
+     * @return The complete job status
+     */
+    public JobStatusResponse getJobStatus(Long correlationId) {
 
-        if (jobExecution == null) {
-            throw new ResourceNotFoundException("Job execution not found");
+        Long jobExecutionId = asyncBatchService.resolveJobExecutionId(correlationId);
+
+        //Assuming status was requested too fast, before jobExecutionId was generated and mapped
+        if (jobExecutionId == null) {
+            log.warn("getJobStatus() was called with correlationId={}, but no map to jobExecutionId was found", correlationId);
+            return JobStatusResponse.builder()
+                    .correlationId(correlationId)
+                    .status("STARTING")
+                    .build();
         }
 
-        // Get fresh step executions from JobExplorer to ensure we have the latest counts
-        // Step executions are updated in real-time as the job processes items
-        long readCount = 0;
-        long writeCount = 0;
-        long skipCount = 0;
-
-        // Get step executions - these are updated in real-time as the job runs
-        for (StepExecution stepExecution : jobExecution.getStepExecutions()) {
-            readCount += stepExecution.getReadCount();
-            writeCount += stepExecution.getWriteCount();
-            skipCount += stepExecution.getSkipCount();
+        JobExecution execution = jobExplorer.getJobExecution(jobExecutionId);
+        if (execution == null) {
+            throw new ResourceNotFoundException(
+                    "Job execution not found for correlationId " + correlationId
+            );
         }
+
+        StepCount stepCount = BatchUtil.countStepProperties(execution);
 
         return JobStatusResponse.builder()
-                .jobExecutionId(jobExecution.getId())
-                .status(jobExecution.getStatus().toString())
-                .startTime(jobExecution.getStartTime())
-                .endTime(jobExecution.getEndTime())
-                .readCount(readCount)
-                .writeCount(writeCount)
-                .skipCount(skipCount)
-                .exitCode(jobExecution.getExitStatus().getExitCode())
-                .exitMessage(jobExecution.getExitStatus().getExitDescription())
+                .correlationId(correlationId)
+                .jobExecutionId(jobExecutionId)
+                .status(execution.getStatus().toString())
+                .startTime(execution.getStartTime())
+                .endTime(execution.getEndTime())
+                .readCount(stepCount.getReadCount())
+                .writeCount(stepCount.getWriteCount())
+                .skipCount(stepCount.getSkipCount())
+                .exitCode(execution.getExitStatus().getExitCode())
+                .exitMessage(execution.getExitStatus().getExitDescription())
                 .build();
     }
 

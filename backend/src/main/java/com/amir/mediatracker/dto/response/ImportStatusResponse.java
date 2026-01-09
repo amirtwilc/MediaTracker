@@ -1,12 +1,11 @@
 package com.amir.mediatracker.dto.response;
 
+import lombok.Builder;
 import lombok.Data;
 
-import java.time.LocalDateTime;
-
 @Data
+@Builder
 public class ImportStatusResponse {
-    private Long jobExecutionId;
+    private Long correlationId;
     private String status;
-    private LocalDateTime startTime;
 }

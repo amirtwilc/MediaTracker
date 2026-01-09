@@ -1,29 +1,31 @@
 # Media Tracker
-Track all the media that you experienced and want to experience in one place. Currently, supports: Movies, TV Series, Video Games
+Track all the media you have experienced, or want to experience, in one place.  
+Currently supported media types: Movies, TV Series, and Video Games.
 
 ## Overview
-This app allows users to make a list of all the media they want to keep track on. 
-Items on the list may contain information about: 
-* Experienced - Whether this item was viewed/played.
-* Re-Experience - If this item has been experienced, is there a desire to experience it again?
-* Rating - User may rate the item between 1-10 stars.
-* Comment - User may add a short comment about the item.
+This application allows users to maintain a personal list of media they want to track.  
+Each item in a user’s list may include: 
+* Experienced: Whether the media item has been viewed or played.
+* Re-experience: Indicates whether the user would like to experience the item again.
+* Rating: The user may rate the item on a scale of 1–10.
+* Comment: The user may add a short personal comment.
 
-This app also incorporated the ability to view other users list, as well as following them. 
-Searching for a user can be done:
+The application also supports viewing other users’ lists and following other users.  
+Users can search for other users:
 * By name
-* By sorting default list according to: Registration Date, Last Active Date, How many Ratings, How many followers
-* By filtering Admins or Users
-* Advanced Search: Decide on up to 5 items and range of rating for each. Search will find all users which rated these items accordingly
+* By sorting the default user list by registration date, last active date, number of ratings, or number of followers
+* By filtering by role (Admin or User)
+* Advanced search: Select up to five media items and a rating range for each.  
+  The search returns users who rated those items within the specified ranges.
 
 Following a user allows:
-* Find user conveniently on the Follow section.
-* Receive alerts when followed user rates an item above a requested threshold.
+* Easily access followed users from the Follow section.
+* Receive notifications when a followed user rates an item above a configured threshold.
 
-If a user is also an Admin, it receives these features:
-* Ability to add and update media items, either one by one or via uploading a CSV file.
-* When an Admin user is viewed by other users, they will see that he is an Admin.
-* When users view an Admin list, comments are visible (comments are invisible by default for regular users).
+If a user has the Admin role, they gain the following additional capabilities:
+* Create and update media items individually or via CSV upload.
+* Admin users are clearly identified as such when viewed by other users.
+* Comments are visible when viewing an Admin’s list (comments are hidden by default for regular users).
 
 ## Quick Start (Run with Docker)
 This project is fully containerized.
@@ -32,7 +34,7 @@ You do not need to install Java, Node.js, PostgreSQL, Kafka, or any other depend
 The only requirement is Docker.
 
 ### Prerequisites
-Install Docker
+Docker must be installed on your system.
 
 Windows / macOS - Download and install Docker Desktop from:
 https://www.docker.com/products/docker-desktop/
@@ -40,7 +42,7 @@ https://www.docker.com/products/docker-desktop/
 Linux - Follow the official instructions for your distribution:
 https://docs.docker.com/engine/install/
 
-After installation, make sure Docker is running. \
+After installation, make sure Docker is running.  
 You can verify Docker is installed by running:
 ```bash
 docker --version
@@ -49,7 +51,7 @@ docker compose version
 If both commands print a version, you are ready.
 
 #### Step 1: Clone the repository
-Run this command where you wish to place project code directory
+Run the following commands in the directory where you want to place the project:
 ```bash
 git clone https://github.com/amirtwilc/MediaTracker.git
 cd MediaTracker
@@ -65,12 +67,12 @@ This may take several minutes the first time because Docker needs to download de
 #### Step 3: Wait until everything is ready
 When the startup is complete, you should see logs indicating that:
 * PostgreSQL is running
-* Kafka is running (Divided into ZooKeeper and Kafka)
+* Kafka is running (ZooKeeper and Kafka services)
 * Backend started successfully
 * Frontend is being served
 
 You should also see "mediatracker" under Docker Desktop's Container's tab. 
-Check that all components have started. If one or more of the component have failed to start, you may try to start it again via the UI. 
+Check that all components have started. If one or more components have failed to start, you may try to start it again via the UI. 
 If still does not start, check the logs to identify the problem.
 
 #### Step 4: Access the application
@@ -84,15 +86,17 @@ http://localhost:8080
 In order to login as an Admin, enter these values:  
 User: Admin  
 Password: 123456  
-Admin may Create and update items in the app.  
+Note: These credentials are for local development only.  
+
+Admins may Create and update items in the app.  
 Alternatively, register a new user to the app. 
 
 #### Step 6: Initialize items in database
-There "Search Media" tab will not display any items at this stage. 
+The "Search Media" tab will not display any items at this stage. 
 For this step, you must be logged as an Admin.  
 Go to "Admin Panel" tab -> Upload CSV -> Choose file -> Choose file from root of this project, named: "media_tracker_sample.csv" -> Click Upload CSV  
 Once the process is finished, items will appear at "Search Media" tab, and the app is ready for use.
-Alternatively, or consecutively, make your own CSV file according to the guidelines, and upload it.
+You may also upload your own CSV file, either instead of the sample file or in addition to it at a later stage. Both approaches are fully supported.
 
 #### Stopping the application
 
@@ -115,29 +119,48 @@ docker compose up --build
 ```
 3. If ports 3000 or 8080 are already in use, stop the conflicting applications
 
+## Architecture
+The project is implemented as a monolith for simplicity and clarity.
+
+### High Level Architecture
+
+![System Architecture](docs/Media_Tracker_system_architecture.png)
+
+* The frontend communicates with the backend via REST APIs.
+* The backend handles business logic and persists data in PostgreSQL.
+* Kafka is used for asynchronous events such as user notifications.
+* All services are orchestrated locally using Docker Compose.
+
 ## Core Motivation
 This project is meant to demonstrate my ability to design and build applications.
 It is also a great foundation and reason for me to learn new technologies, AI tools, and software principals that I wish to learn.
-For this reason, some features on this project are not necessarily using the best approaches, 
-and might have been coded differently in reality. 
+As a result, some features intentionally prioritize learning and experimentation over production-optimal approaches.
 In the next paragraphs I will try to explain my rationale for the main components and technologies used in this project.
 
-## Architecture
-Project is built as Monolith for simplicity.
+## What This Project Demonstrates
 
-### Technologies 
+* System design: Designing a full-stack application with clear domain boundaries, role-based behavior (users vs. admins), and well-defined responsibilities across backend, database, messaging, and frontend layers.
+* Data modeling: Modeling relational data for users, media items, ratings, followers, and notifications, including consideration of relationships, constraints, and future extensibility.
+* Dockerized environments: Running the entire system locally using Docker Compose, enabling consistent setup of the backend, frontend, database, and messaging infrastructure without manual dependency installation.
+* Tradeoff analysis: Making intentional design choices (e.g., monolithic architecture, CSV-based ingestion, Kafka usage) and explicitly documenting their benefits, limitations, and possible alternatives.
+* Learning and adaptation: Integrating and working with technologies outside my primary expertise (e.g., React, PostreSQL, GraphQL) and using the project as a structured learning platform.
 
-Backend language: Java Spring - This is where my experience lies. The main goal of this project is to demonstrate my Java Spring knowledge and expertise. 
+### Technologies
 
-Database: PostgresSQL - Mainly picked for get-to-know purposes. I also believe relational database is a good decision here.
+* Backend: Java (Spring Boot)  
+  This is where my experience lies. The main goal of this project is to demonstrate my Java Spring knowledge and expertise.
 
-Message Queue: Kafka - Picked because of my strong experience and is an important technology to demonstrate knowledge of.
+* Database: PostgreSQL  
+  Mainly picked for get-to-know purposes. I also believe relational database is a good decision here.
 
-Frontend language: React - Although this a language I want to learn more about, learning it was not main concern for this project, and most code was written by AI. 
-I really just wanted a powerful language to showcase my backend visually, my way of thinking and attention to detail, and also my ability to create powerful application even without full knowledge of a language. 
-It is still a sub goal of mine, to understand how every line works and by extension - learn React
+* Message Queue: Kafka  
+  Picked because of my strong experience and is an important technology to demonstrate knowledge of.
 
-AI tools: Claude, ChatGPT, Cursor, Windsurf
+* Frontend: React  
+  React was used to provide a modern, interactive UI. While frontend development was not the primary focus of this project, it allowed me to effectively showcase backend capabilities and overall system design.
+
+* AI tools: Claude, ChatGPT, Cursor, Windsurf  
+  AI tools were used as productivity and learning accelerators, not as a replacement for architectural decision-making or code review.
 
 ### Core decisions
 
@@ -179,16 +202,18 @@ The solution for both latter cases is probably to limit the new items allowed to
 
 ## Next Steps
 
-* Make the app live, accessible from everywhere
-* Authentication should be extended. For example, currently no way to recover password
-* Ability to extract own list into file. 
-* Create/Fetch items more efficiently - probably via global APIs
-* Add posters. There are global APIs which allow to simply fetch directly from them, instead of saving all in own db. If fetch fails, return to normal behavior
-* Solve problem of showing correct platforms for users, based on region
-* Allow users to suggest or add items. Maybe have a central place where users can see other users' suggestions and vote
+* Security and authentication improvements (e.g., password recovery and account management)
+* Observability: Enhance logging, introduce distributed tracing, and add monitoring dashboards
+* Allow users to export their own lists to a file (e.g., CSV or JSON)
+* Improve media ingestion by creating and fetching items via global public APIs
+* Add media posters using external APIs, fetching assets dynamically instead of storing them locally, with graceful fallback if retrieval fails
+* Improve platform availability accuracy by resolving platform differences based on user region
+* Allow users to suggest new items, potentially via a centralized suggestion area where the community can review and vote
+* Testing: Maintain and expand test coverage, enhance integration tests, and introduce load and stress testing
+* Scalability improvements: Introduce caching, optimize database queries, and evaluate a potential transition to a microservices architecture
+* Deploy the application to a publicly accessible environment
 
+## Author
 
-
-
-
+Developed by Amir Twil-Cohen as a personal project to explore system design, backend architecture, and full-stack integration.
 

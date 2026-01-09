@@ -82,4 +82,14 @@ public class UserPrincipal implements UserDetails {
     public boolean isEnabled() {
         return true;
     }
+
+    @Override
+    public String toString() {
+        return "UserPrincipal{" +
+                "id=" + id +
+                ", username='" + username + '\'' +
+                ", role=" + role +
+                ", authorities=" + authorities +
+                '}';
+    }
 }
