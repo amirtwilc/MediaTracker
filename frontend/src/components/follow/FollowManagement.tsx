@@ -25,8 +25,8 @@ export const FollowManagement: React.FC<FollowManagementProps> = ({ onViewUser }
   const loadData = async () => {
     try {
       const [followingData, followersData] = await Promise.all([
-        api.getFollowing(),
-        api.getFollowers(),
+        api.getFollowingGraphQL(),
+        api.getFollowersGraphQL(),
       ]);
       setFollowing(followingData);
       setFollowers(followersData);
@@ -41,7 +41,7 @@ export const FollowManagement: React.FC<FollowManagementProps> = ({ onViewUser }
     if (!unfollowConfirm.userId) return;
     
     try {
-      await api.unfollowUser(unfollowConfirm.userId);
+      await api.unfollowUserGraphQL(unfollowConfirm.userId);
       await loadData();
       setUnfollowConfirm({ show: false, userId: null, username: '' });
     } catch (error) {

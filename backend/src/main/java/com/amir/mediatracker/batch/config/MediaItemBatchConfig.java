@@ -1,5 +1,6 @@
 package com.amir.mediatracker.batch.config;
 
+import com.amir.mediatracker.batch.exception.SkippableItemException;
 import com.amir.mediatracker.batch.listener.JobCompletionListener;
 import com.amir.mediatracker.batch.model.MediaItemCSV;
 import com.amir.mediatracker.entity.MediaItem;
@@ -38,9 +39,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 public class MediaItemBatchConfig {
 
     private final MediaItemBatchProperties batchProperties;
-
     private final JobRepository jobRepository;
-
     private final PlatformTransactionManager transactionManager;
 
     @Bean
@@ -63,8 +62,8 @@ public class MediaItemBatchConfig {
                 .processor(processor)
                 .writer(writer)
                 .faultTolerant()
+                .skip(SkippableItemException.class)
                 .skipLimit(batchProperties.getSkipLimit())
-                .skip(Exception.class) //intentional - skip every exception
                 .build();
     }
 
@@ -84,6 +83,7 @@ public class MediaItemBatchConfig {
                 .strict(true) //fail if csv does not contain exactly these columns
                 .linesToSkip(1)
                 .fieldSetMapper(mapper)
+                .recordSeparatorPolicy(new BlankLineRecordSeparatorPolicy())
                 .build();
     }
 }

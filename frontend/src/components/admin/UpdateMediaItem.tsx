@@ -48,14 +48,17 @@ export const UpdateMediaItem: React.FC = () => {
 
   const loadPage = async (pageNum: number, cursor: { name: string; id: number } | null) => {
     setSearchLoading(true);
+    setHasSearched(true);
+
     try {
-      const response = await api.searchMediaItemsCursor({
-        query: searchQuery,
+      // Use GraphQL for cursor-based search
+      const response = await api.searchMediaItemsGraphQL({
+        query: searchQuery || '',
         cursorName: cursor?.name,
         cursorId: cursor?.id,
         limit: 20,
       });
-
+      
       setSearchResults(response.items);
       setHasNextPage(response.hasMore);
       setHasPrevPage(pageNum > 0);
@@ -73,10 +76,9 @@ export const UpdateMediaItem: React.FC = () => {
           return newCursors;
         });
       }
-
-      setHasSearched(true);
     } catch (error) {
-      console.error('Failed to load items', error);
+      console.error('Search failed', error);
+      setSearchResults([]);
     } finally {
       setSearchLoading(false);
     }

@@ -18,7 +18,6 @@ public class BatchUtil {
         long writeCount = 0;
         long skipCount = 0;
 
-        // Get step executions - these are updated in real-time as the job runs
         for (StepExecution stepExecution : jobExecution.getStepExecutions()) {
             readCount += stepExecution.getReadCount();
             writeCount += stepExecution.getWriteCount();

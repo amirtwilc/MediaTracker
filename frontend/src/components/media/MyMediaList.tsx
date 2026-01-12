@@ -75,11 +75,11 @@ export const MyMediaList: React.FC = () => {
       const categories = filterCategories.length > 0 ? filterCategories : undefined;
       
       const [genresData, platformsData] = await Promise.all([
-        api.getMyListGenres({ 
+        api.getMyListGenresGraphQL({ 
           searchQuery: debouncedSearchQuery || undefined, 
           categories 
         }),
-        api.getMyListPlatforms({ 
+        api.getMyListPlatformsGraphQL({ 
           searchQuery: debouncedSearchQuery || undefined, 
           categories 
         }),
@@ -155,8 +155,8 @@ export const MyMediaList: React.FC = () => {
     const categories = filterCategories.length > 0 ? filterCategories : undefined;
 
     if (paginationMode === 'offset' && sortConfig) {
-      // Use sorted endpoint with offset pagination
-      const response = await api.getMyMediaListSorted({
+      // Use GraphQL sorted endpoint with offset pagination
+      const response = await api.getMyMediaListSortedGraphQL({
         searchQuery: debouncedSearchQuery || undefined,
         categories,
         genreIds,
@@ -175,8 +175,8 @@ export const MyMediaList: React.FC = () => {
         totalCount: response.totalElements,
       };
     } else {
-      // Use cursor endpoint (unsorted, default by name)
-      const response = await api.getMyMediaListCursor({
+      // Use GraphQL cursor endpoint (unsorted, default by name)
+      const response = await api.getMyMediaListCursorGraphQL({
         searchQuery: debouncedSearchQuery || undefined,
         categories,
         genreIds,
@@ -238,10 +238,10 @@ export const MyMediaList: React.FC = () => {
     }
   };
 
-  const loadPage = async (pageNum: number) => {
+  const loadPage = async (pageNum: number, forceRefresh = false) => {
     const cacheKey = getCacheKey(pageNum);
 
-    if (pageCache[cacheKey]) {
+    if (!forceRefresh && pageCache[cacheKey]) {
       const cached = pageCache[cacheKey];
       setItems(cached.items);
       setHasNextPage(cached.hasMore);
@@ -336,15 +336,19 @@ export const MyMediaList: React.FC = () => {
 
   const handleSaveEdit = async (id: number) => {
     try {
-      await api.updateMyListItem(id, editState);
-      
-      setPageCache({});
-      setCursors([null]);
-      await loadPage(currentPage);
-      await loadAvailableFilters();
+      await api.updateMyListItemGraphQL(id, editState);
       
       setEditingId(null);
       setEditState({});
+      
+      // Complete state reset
+      setPageCache({});
+      setCursors([null]);
+      setCurrentPage(0);
+      
+      // Force reload bypassing cache
+      await loadPage(0, true);
+      await loadAvailableFilters();
     } catch (error) {
       console.error('Failed to update item', error);
     }
@@ -357,11 +361,15 @@ export const MyMediaList: React.FC = () => {
   const confirmDelete = async () => {
     if (deleteConfirm.id) {
       try {
-        await api.removeFromMyList(deleteConfirm.id);
+        await api.removeFromMyListGraphQL(deleteConfirm.id);
         
+        // Complete state reset
         setPageCache({});
         setCursors([null]);
-        await loadPage(0);
+        setCurrentPage(0);
+        
+        // Force reload bypassing cache
+        await loadPage(0, true);
         await loadAvailableFilters();
       } catch (error) {
         console.error('Failed to remove item', error);

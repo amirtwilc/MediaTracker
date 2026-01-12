@@ -66,7 +66,7 @@ export const AdvancedUserSearch: React.FC<AdvancedUserSearchProps> = ({ onViewUs
         setHasSearched(true);
 
         try {
-            const response = await api.searchMediaItemsCursor({
+            const response = await api.searchMediaItemsGraphQL({
                 query: searchQuery || '',
                 cursorName: cursor?.name,
                 cursorId: cursor?.id,

@@ -21,7 +21,11 @@ import java.util.Arrays;
 @Component
 public class LogAroundAspect {
 
-    @Around("@annotation(com.amir.mediatracker.aop.LogAround)")
+    @Around(
+            "@within(com.amir.mediatracker.aop.LogAround) || " +
+                    "@annotation(com.amir.mediatracker.aop.LogAround)"
+    )
+    //@Around("@annotation(com.amir.mediatracker.aop.LogAround)")
     public Object logExecution(ProceedingJoinPoint pjp) throws Throwable {
         String className = pjp.getTarget().getClass().getSimpleName();
         String methodName = pjp.getSignature().getName();

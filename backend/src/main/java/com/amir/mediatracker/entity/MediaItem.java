@@ -3,6 +3,7 @@ package com.amir.mediatracker.entity;
 import com.amir.mediatracker.dto.Category;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
@@ -17,6 +18,7 @@ import java.util.Set;
 @Entity
 @Table(name = "media_items")
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @EntityListeners(AuditingEntityListener.class)
@@ -38,7 +40,7 @@ public class MediaItem {
     @Column(name = "avg_rating", precision = 3, scale = 1)
     private BigDecimal avgRating;
 
-    @ManyToMany(fetch = FetchType.EAGER, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @ManyToMany(fetch = FetchType.EAGER, cascade = {CascadeType.MERGE})
     @JoinTable(
             name = "media_item_genres",
             joinColumns = @JoinColumn(name = "media_item_id"),
@@ -46,7 +48,7 @@ public class MediaItem {
     )
     private Set<Genre> genres = new HashSet<>();
 
-    @ManyToMany(fetch = FetchType.EAGER, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @ManyToMany(fetch = FetchType.EAGER, cascade = {CascadeType.MERGE})
     @JoinTable(
             name = "media_item_platforms",
             joinColumns = @JoinColumn(name = "media_item_id"),

@@ -1,6 +1,12 @@
 type Query {
-  searchMediaItems(query: String!, category: Category, page: Int = 0, size: Int = 20): [MediaItemResponse]
-  myMediaList(page: Int = 0, size: Int = 20): [UserMediaListResponse]
+  searchMediaItems(input: SearchMediaInput!): MediaSearchResult!
+  searchMediaItemsSorted(input: SearchMediaSortedInput!): MediaPageResult!
+  myMediaListCursor(input: MyMediaListInput!): UserMediaListSearchResult!
+  myMediaListSorted(input: MyMediaListSortedInput!): UserMediaListPageResult!
+  myListGenres(input: MyListFiltersInput!): [GenreResponse!]!
+  myListPlatforms(input: MyListFiltersInput!): [PlatformResponse!]!
+  availableMediaGenres(input: AvailableFiltersInput!): [GenreResponse!]!
+  availableMediaPlatforms(input: AvailableFiltersInput!): [PlatformResponse!]!
   myFollowers: [UserResponse]
   myFollowing: [UserFollowResponse]
 }
@@ -15,20 +21,45 @@ type Mutation {
   updateFollowThreshold(followUserId: ID!, threshold: Int!): UserFollowResponse
 }
 
+input SearchMediaInput {
+  query: String!
+  categories: [Category!]
+  genreIds: [ID!]
+  platformIds: [ID!]
+  cursorName: String
+  cursorId: ID
+  limit: Int
+}
+
+type MediaSearchResult {
+  items: [MediaItemResponse!]!
+  nextCursor: Cursor
+  hasMore: Boolean!
+  totalCount: Int!
+}
+
+type Cursor {
+  name: String!
+  id: ID!
+}
+
 enum Category {
   MOVIE
   SERIES
   GAME
 }
 
-# Your existing DTOs become GraphQL object types
 type MediaItemResponse {
   id: ID!
-  name: String
-  category: Category
+  name: String!
+  category: Category!
   year: Int
-  genres: [GenreResponse]
-  platforms: [PlatformResponse]
+  avgRating: Float
+  inUserList: Boolean
+  genres: [GenreResponse!]!
+  platforms: [PlatformResponse!]!
+  createdAt: String
+  updatedAt: String
 }
 
 type GenreResponse {
@@ -48,16 +79,24 @@ type UserMediaListResponse {
   wishToReexperience: Boolean
   rating: Int
   comment: String
+  addedAt: String
+  updatedAt: String
 }
 
 type UserResponse {
   id: ID!
   username: String
+  email: String
+  role: String
+  createdAt: String
+  ratingsCount: Int
 }
 
 type UserFollowResponse {
+  id: ID!
   user: UserResponse
   minimumRatingThreshold: Int
+  createdAt: String
 }
 
 input UpdateMediaListRequest {
@@ -70,4 +109,76 @@ input UpdateMediaListRequest {
 input FollowRequest {
   userId: ID!
   minimumRatingThreshold: Int = 7
+}
+
+input SearchMediaSortedInput {
+  query: String!
+  categories: [Category!]
+  genreIds: [ID!]
+  platformIds: [ID!]
+  page: Int
+  size: Int
+  sortBy: String
+  sortDirection: SortDirection
+}
+
+enum SortDirection {
+  ASC
+  DESC
+}
+
+type MediaPageResult {
+  content: [MediaItemResponse!]!
+  totalPages: Int!
+  totalElements: Int!
+  number: Int!
+  size: Int!
+}
+
+input MyMediaListInput {
+  searchQuery: String
+  categories: [Category!]
+  genreIds: [ID!]
+  platformIds: [ID!]
+  wishToExperience: Boolean
+  cursorName: String
+  cursorId: ID
+  limit: Int
+}
+
+type UserMediaListSearchResult {
+  items: [UserMediaListResponse!]!
+  nextCursor: Cursor
+  hasMore: Boolean!
+  totalCount: Int!
+}
+
+input MyMediaListSortedInput {
+  searchQuery: String
+  categories: [Category!]
+  genreIds: [ID!]
+  platformIds: [ID!]
+  wishToExperience: Boolean
+  page: Int
+  size: Int
+  sortBy: String
+  sortDirection: SortDirection
+}
+
+type UserMediaListPageResult {
+  content: [UserMediaListResponse!]!
+  totalPages: Int!
+  totalElements: Int!
+  number: Int!
+  size: Int!
+}
+
+input MyListFiltersInput {
+  searchQuery: String
+  categories: [Category!]
+}
+
+input AvailableFiltersInput {
+  query: String
+  categories: [Category!]
 }

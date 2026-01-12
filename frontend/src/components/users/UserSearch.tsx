@@ -86,7 +86,7 @@ export const UserSearch: React.FC<UserSearchProps> = ({ onViewUser }) => {
 
   const handleFollowConfirm = async (threshold: number | null) => {
     try {
-      await api.followUser(followModal.userId, threshold === null ? 0 : threshold);
+      await api.followUserGraphQL(followModal.userId, threshold === null ? 0 : threshold);
       setFollowingUsers(new Set(followingUsers).add(followModal.userId));
       loadUsers(currentPage);
       setFollowModal({ show: false, userId: 0, username: '' });
@@ -97,7 +97,7 @@ export const UserSearch: React.FC<UserSearchProps> = ({ onViewUser }) => {
 
   const handleUnfollow = async (userId: number) => {
     try {
-      await api.unfollowUser(userId);
+      await api.unfollowUserGraphQL(userId);
       const newFollowing = new Set(followingUsers);
       newFollowing.delete(userId);
       setFollowingUsers(newFollowing);

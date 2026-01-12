@@ -1,5 +1,6 @@
 package com.amir.mediatracker.graphql;
 
+import com.amir.mediatracker.aop.LogAround;
 import com.amir.mediatracker.dto.request.FollowRequest;
 import com.amir.mediatracker.dto.request.UpdateMediaListRequest;
 import com.amir.mediatracker.dto.response.UserFollowResponse;
@@ -12,10 +13,9 @@ import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Controller;
 
-import java.math.BigDecimal;
+@LogAround
 @Controller
 @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
 @RequiredArgsConstructor

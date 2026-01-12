@@ -43,7 +43,7 @@ public class AsyncBatchService {
                     execution.getId()
             );
         } catch (Exception ex) {
-            log.error("Failed to start import job", ex);
+            log.error("Failed to start import job with correlationId={}", correlationId, ex);
         }
     }
 

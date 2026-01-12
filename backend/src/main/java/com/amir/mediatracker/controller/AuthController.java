@@ -29,7 +29,7 @@ import java.time.LocalDateTime;
 
 @Slf4j
 @RestController
-@RequestMapping("/media-tracker/auth")
+@RequestMapping("/auth")
 public class AuthController {
 
     @Autowired

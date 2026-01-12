@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/media-tracker/notifications")
+@RequestMapping("/notifications")
 @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
 public class NotificationController {
 
@@ -25,7 +25,6 @@ public class NotificationController {
 
     // Get user's notifications
     @GetMapping
-    @LogAround
     public ResponseEntity<List<NotificationResponse>> getNotifications(
             @RequestParam(required = false, defaultValue = "false") boolean onlyUnread,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
@@ -37,7 +36,6 @@ public class NotificationController {
 
     // Mark notification as read
     @PutMapping("/{id}/read")
-    @LogAround
     public ResponseEntity<NotificationResponse> markAsRead(
             @PathVariable Long id,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
@@ -47,7 +45,6 @@ public class NotificationController {
 
     // Mark all notifications as read
     @PutMapping("/read-all")
-    @LogAround
     public ResponseEntity<Void> markAllAsRead(Authentication authentication,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
         Long userId = userPrincipal.getId();

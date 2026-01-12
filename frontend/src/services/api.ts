@@ -108,6 +108,161 @@ class ApiClient {
     return res.json();
   }
 
+  async searchMediaItemsGraphQL(params: {
+    query: string;
+    categories?: string[];
+    genreIds?: number[];
+    platformIds?: number[];
+    cursorName?: string;
+    cursorId?: number;
+    limit?: number;
+  }): Promise<{
+    items: MediaItem[];
+    nextCursor?: { name: string; id: number };
+    hasMore: boolean;
+    totalCount: number;
+  }> {
+    const graphqlQuery = `
+      query SearchMediaItems($input: SearchMediaInput!) {
+        searchMediaItems(input: $input) {
+          items {
+            id
+            name
+            category
+            year
+            avgRating
+            inUserList
+            genres {
+              id
+              name
+            }
+            platforms {
+              id
+              name
+            }
+            createdAt
+            updatedAt
+          }
+          nextCursor {
+            name
+            id
+          }
+          hasMore
+          totalCount
+        }
+      }
+    `;
+
+    const variables = {
+      input: {
+        query: params.query,
+        categories: params.categories,
+        genreIds: params.genreIds,
+        platformIds: params.platformIds,
+        cursorName: params.cursorName,
+        cursorId: params.cursorId,
+        limit: params.limit ?? 20,
+      },
+    };
+
+    const res = await fetch(`${API_BASE}/graphql`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({
+        query: graphqlQuery,
+        variables,
+      }),
+    });
+
+    if (!res.ok) throw new Error('GraphQL search failed');
+
+    const result = await res.json();
+
+    if (result.errors) {
+      throw new Error(result.errors[0].message);
+    }
+
+    return result.data.searchMediaItems;
+  }
+
+  async searchMediaItemsSortedGraphQL(params: {
+    query: string;
+    categories?: string[];
+    genreIds?: number[];
+    platformIds?: number[];
+    page?: number;
+    size?: number;
+    sortBy?: string;
+    sortDirection?: string;
+  }): Promise<{
+    content: MediaItem[];
+    totalPages: number;
+    totalElements: number;
+    number: number;
+    size: number;
+  }> {
+    const graphqlQuery = `
+      query SearchMediaItemsSorted($input: SearchMediaSortedInput!) {
+        searchMediaItemsSorted(input: $input) {
+          content {
+            id
+            name
+            category
+            year
+            avgRating
+            inUserList
+            genres {
+              id
+              name
+            }
+            platforms {
+              id
+              name
+            }
+            createdAt
+            updatedAt
+          }
+          totalPages
+          totalElements
+          number
+          size
+        }
+      }
+    `;
+
+    const variables = {
+      input: {
+        query: params.query,
+        categories: params.categories,
+        genreIds: params.genreIds,
+        platformIds: params.platformIds,
+        page: params.page ?? 0,
+        size: params.size ?? 20,
+        sortBy: params.sortBy ?? 'name',
+        sortDirection: params.sortDirection ?? 'ASC',
+      },
+    };
+
+    const res = await fetch(`${API_BASE}/graphql`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({
+        query: graphqlQuery,
+        variables,
+      }),
+    });
+
+    if (!res.ok) throw new Error('GraphQL search failed');
+
+    const result = await res.json();
+
+    if (result.errors) {
+      throw new Error(result.errors[0].message);
+    }
+
+    return result.data.searchMediaItemsSorted;
+  }
+
   async searchMediaItemsSorted(params: {
     query: string;
     categories?: string[];
@@ -154,17 +309,7 @@ class ApiClient {
     return res.json();
   }
 
-  // User Media List
-  async getMyMediaList(page = 0, size = 100): Promise<UserMediaListItem[]> {
-    const res = await fetch(`${API_BASE}/user/my-list?page=${page}&size=${size}`, {
-      headers: this.getHeaders(),
-    });
-
-    if (!res.ok) throw new Error('Failed to fetch list');
-    return res.json();
-  }
-
-  async getMyMediaListCursor(params: {
+  async getMyMediaListCursorGraphQL(params: {
     searchQuery?: string;
     categories?: string[];
     genreIds?: number[];
@@ -179,52 +324,79 @@ class ApiClient {
     hasMore: boolean;
     totalCount: number;
   }> {
-    const searchParams = new URLSearchParams({
-      limit: String(params.limit ?? 20),
+    const graphqlQuery = `
+      query MyMediaListCursor($input: MyMediaListInput!) {
+        myMediaListCursor(input: $input) {
+          items {
+            id
+            mediaItem {
+              id
+              name
+              category
+              year
+              avgRating
+              genres {
+                id
+                name
+              }
+              platforms {
+                id
+                name
+              }
+              createdAt
+              updatedAt
+            }
+            experienced
+            wishToReexperience
+            rating
+            comment
+            addedAt
+            updatedAt
+          }
+          nextCursor {
+            name
+            id
+          }
+          hasMore
+          totalCount
+        }
+      }
+    `;
+
+    const variables = {
+      input: {
+        searchQuery: params.searchQuery,
+        categories: params.categories,
+        genreIds: params.genreIds,
+        platformIds: params.platformIds,
+        wishToExperience: params.wishToExperience,
+        cursorName: params.cursorName,
+        cursorId: params.cursorId,
+        limit: params.limit ?? 20,
+      },
+    };
+
+    const res = await fetch(`${API_BASE}/graphql`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({
+        query: graphqlQuery,
+        variables,
+      }),
     });
 
-    if (params.searchQuery) {
-      searchParams.append('searchQuery', params.searchQuery);
+    if (!res.ok) throw new Error('GraphQL query failed');
+
+    const result = await res.json();
+
+    if (result.errors) {
+      throw new Error(result.errors[0].message);
     }
 
-    params.categories?.forEach(cat =>
-      searchParams.append('categories', cat)
-    );
-
-    if (params.wishToExperience !== undefined) {
-      searchParams.append('wishToExperience', String(params.wishToExperience));
-    }
-
-    if (params.cursorName && params.cursorId !== undefined) {
-      searchParams.append('cursorName', params.cursorName);
-      searchParams.append('cursorId', String(params.cursorId));
-    }
-
-    params.genreIds?.forEach(id =>
-      searchParams.append('genreIds', String(id))
-    );
-
-    params.platformIds?.forEach(id =>
-      searchParams.append('platformIds', String(id))
-    );
-
-    const res = await fetch(
-      `${API_BASE}/user/my-list/cursor?${searchParams.toString()}`,
-      { headers: this.getHeaders() }
-    );
-
-    if (!res.ok) throw new Error('Failed to fetch list');
-
-    const data = await res.json();
-    return {
-      items: data.items,
-      nextCursor: data.nextCursor,
-      hasMore: data.hasMore,
-      totalCount: data.totalCount,
-    };
+    return result.data.myMediaListCursor;
   }
 
-  async getMyMediaListSorted(params: {
+  async getMyMediaListSortedGraphQL(params: {
     searchQuery?: string;
     categories?: string[];
     genreIds?: number[];
@@ -241,76 +413,222 @@ class ApiClient {
     number: number;
     size: number;
   }> {
-    const searchParams = new URLSearchParams({
-      page: String(params.page ?? 0),
-      size: String(params.size ?? 20),
-      sortBy: params.sortBy ?? 'name',
-      sortDirection: params.sortDirection ?? 'ASC',
-    });
+    const graphqlQuery = `
+      query MyMediaListSorted($input: MyMediaListSortedInput!) {
+        myMediaListSorted(input: $input) {
+          content {
+            id
+            mediaItem {
+              id
+              name
+              category
+              year
+              avgRating
+              genres {
+                id
+                name
+              }
+              platforms {
+                id
+                name
+              }
+              createdAt
+              updatedAt
+            }
+            experienced
+            wishToReexperience
+            rating
+            comment
+            addedAt
+            updatedAt
+          }
+          totalPages
+          totalElements
+          number
+          size
+        }
+      }
+    `;
 
-    if (params.searchQuery) {
-      searchParams.append('searchQuery', params.searchQuery);
-    }
+    const variables = {
+      input: {
+        searchQuery: params.searchQuery,
+        categories: params.categories,
+        genreIds: params.genreIds,
+        platformIds: params.platformIds,
+        wishToExperience: params.wishToExperience,
+        page: params.page ?? 0,
+        size: params.size ?? 20,
+        sortBy: params.sortBy ?? 'name',
+        sortDirection: params.sortDirection ?? 'ASC',
+      },
+    };
 
-    params.categories?.forEach(cat =>
-      searchParams.append('categories', cat)
-    );
-
-    if (params.wishToExperience !== undefined) {
-      searchParams.append('wishToExperience', String(params.wishToExperience));
-    }
-
-    params.genreIds?.forEach(id =>
-      searchParams.append('genreIds', String(id))
-    );
-
-    params.platformIds?.forEach(id =>
-      searchParams.append('platformIds', String(id))
-    );
-
-    const res = await fetch(
-      `${API_BASE}/user/my-list/sorted?${searchParams.toString()}`,
-      { headers: this.getHeaders() }
-    );
-
-    if (!res.ok) throw new Error('Failed to fetch list');
-
-    return res.json();
-  }
-  
-
-  async addToMyList(mediaItemId: number): Promise<UserMediaListItem> {
-    const res = await fetch(`${API_BASE}/user/my-list`, {
+    const res = await fetch(`${API_BASE}/graphql`, {
       method: 'POST',
       headers: this.getHeaders(),
-      body: JSON.stringify({ mediaItemId }),
+      body: JSON.stringify({
+        query: graphqlQuery,
+        variables,
+      }),
     });
 
-    if (!res.ok) {
-      const error = await res.json();
-      throw new Error(error.message || 'Failed to add item');
+    if (!res.ok) throw new Error('GraphQL query failed');
+
+    const result = await res.json();
+
+    if (result.errors) {
+      throw new Error(result.errors[0].message);
     }
-    return res.json();
+
+    return result.data.myMediaListSorted;
   }
 
-  async updateMyListItem(id: number, data: Partial<UserMediaListItem>): Promise<UserMediaListItem> {
-    const res = await fetch(`${API_BASE}/user/my-list/${id}`, {
-      method: 'PUT',
+  async addToMyListGraphQL(mediaItemId: number): Promise<UserMediaListItem> {
+    const graphqlQuery = `
+      mutation AddMediaToList($mediaItemId: ID!) {
+        addMediaToList(mediaItemId: $mediaItemId) {
+          id
+          mediaItem {
+            id
+            name
+            category
+            year
+            avgRating
+            genres {
+              id
+              name
+            }
+            platforms {
+              id
+              name
+            }
+            createdAt
+            updatedAt
+          }
+          experienced
+          wishToReexperience
+          rating
+          comment
+          addedAt
+          updatedAt
+        }
+      }
+    `;
+
+    const variables = {
+      mediaItemId: mediaItemId.toString(),
+    };
+
+    const res = await fetch(`${API_BASE}/graphql`, {
+      method: 'POST',
       headers: this.getHeaders(),
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        query: graphqlQuery,
+        variables,
+      }),
     });
 
-    if (!res.ok) throw new Error('Failed to update item');
-    return res.json();
+    if (!res.ok) throw new Error('GraphQL mutation failed');
+
+    const result = await res.json();
+
+    if (result.errors) {
+      throw new Error(result.errors[0].message);
+    }
+
+    return result.data.addMediaToList;
   }
 
-  async removeFromMyList(id: number): Promise<void> {
-    const res = await fetch(`${API_BASE}/user/my-list/${id}`, {
-      method: 'DELETE',
+  async updateMyListItemGraphQL(id: number, data: Partial<UserMediaListItem>): Promise<UserMediaListItem> {
+    const graphqlQuery = `
+      mutation UpdateMediaListItem($id: ID!, $request: UpdateMediaListRequest!) {
+        updateMediaListItem(id: $id, request: $request) {
+          id
+          mediaItem {
+            id
+            name
+            category
+            year
+            avgRating
+            genres {
+              id
+              name
+            }
+            platforms {
+              id
+              name
+            }
+            createdAt
+            updatedAt
+          }
+          experienced
+          wishToReexperience
+          rating
+          comment
+          addedAt
+          updatedAt
+        }
+      }
+    `;
+
+    const variables = {
+      id: id.toString(),
+      request: {
+        experienced: data.experienced,
+        wishToReexperience: data.wishToReexperience,
+        rating: data.rating,
+        comment: data.comment,
+      },
+    };
+
+    const res = await fetch(`${API_BASE}/graphql`, {
+      method: 'POST',
       headers: this.getHeaders(),
+      body: JSON.stringify({
+        query: graphqlQuery,
+        variables,
+      }),
     });
 
-    if (!res.ok) throw new Error('Failed to remove item');
+    if (!res.ok) throw new Error('GraphQL mutation failed');
+
+    const result = await res.json();
+
+    if (result.errors) {
+      throw new Error(result.errors[0].message);
+    }
+
+    return result.data.updateMediaListItem;
+  }
+
+  async removeFromMyListGraphQL(id: number): Promise<void> {
+    const graphqlQuery = `
+      mutation RemoveMediaFromList($id: ID!) {
+        removeMediaFromList(id: $id)
+      }
+    `;
+
+    const variables = {
+      id: id.toString(),
+    };
+
+    const res = await fetch(`${API_BASE}/graphql`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({
+        query: graphqlQuery,
+        variables,
+      }),
+    });
+
+    if (!res.ok) throw new Error('GraphQL mutation failed');
+
+    const result = await res.json();
+
+    if (result.errors) {
+      throw new Error(result.errors[0].message);
+    }
   }
 
   // Notifications
@@ -352,54 +670,188 @@ class ApiClient {
     return data.unreadCount;
   }
 
-  // Follow
-  async followUser(userId: number, threshold: number): Promise<UserFollow> {
-    const res = await fetch(`${API_BASE}/user/follow`, {
+  async followUserGraphQL(userId: number, threshold: number): Promise<UserFollow> {
+    const graphqlQuery = `
+      mutation FollowUser($request: FollowRequest!) {
+        followUser(request: $request) {
+          id
+          user {
+            id
+            username
+            email
+            role
+          }
+          minimumRatingThreshold
+          createdAt
+        }
+      }
+    `;
+
+    const variables = {
+      request: {
+        userId: userId.toString(),
+        minimumRatingThreshold: threshold,
+      },
+    };
+
+    const res = await fetch(`${API_BASE}/graphql`, {
       method: 'POST',
       headers: this.getHeaders(),
-      body: JSON.stringify({ userId, minimumRatingThreshold: threshold }),
+      body: JSON.stringify({
+        query: graphqlQuery,
+        variables,
+      }),
     });
 
-    if (!res.ok) throw new Error('Failed to follow user');
-    return res.json();
+    if (!res.ok) throw new Error('GraphQL mutation failed');
+
+    const result = await res.json();
+
+    if (result.errors) {
+      throw new Error(result.errors[0].message);
+    }
+
+    return result.data.followUser;
   }
 
-  async updateFollowThreshold(userId: number, threshold: number): Promise<UserFollow> {
-    const res = await fetch(`${API_BASE}/user/follow/${userId}/threshold`, {
-      method: 'PUT',
+  async unfollowUserGraphQL(userId: number): Promise<void> {
+    const graphqlQuery = `
+      mutation UnfollowUser($followUserId: ID!) {
+        unfollowUser(followUserId: $followUserId)
+      }
+    `;
+
+    const variables = {
+      followUserId: userId.toString(),
+    };
+
+    const res = await fetch(`${API_BASE}/graphql`, {
+      method: 'POST',
       headers: this.getHeaders(),
-      body: JSON.stringify({ threshold }),
+      body: JSON.stringify({
+        query: graphqlQuery,
+        variables,
+      }),
     });
 
-    if (!res.ok) throw new Error('Failed to update threshold');
-    return res.json();
+    if (!res.ok) throw new Error('GraphQL mutation failed');
+
+    const result = await res.json();
+
+    if (result.errors) {
+      throw new Error(result.errors[0].message);
+    }
   }
 
-  async unfollowUser(userId: number): Promise<void> {
-    const res = await fetch(`${API_BASE}/user/follow/${userId}`, {
-      method: 'DELETE',
+  async updateFollowThresholdGraphQL(userId: number, threshold: number): Promise<UserFollow> {
+    const graphqlQuery = `
+      mutation UpdateFollowThreshold($followUserId: ID!, $threshold: Int!) {
+        updateFollowThreshold(followUserId: $followUserId, threshold: $threshold) {
+          id
+          user {
+            id
+            username
+            email
+            role
+          }
+          minimumRatingThreshold
+          createdAt
+        }
+      }
+    `;
+
+    const variables = {
+      followUserId: userId.toString(),
+      threshold: threshold,
+    };
+
+    const res = await fetch(`${API_BASE}/graphql`, {
+      method: 'POST',
       headers: this.getHeaders(),
+      body: JSON.stringify({
+        query: graphqlQuery,
+        variables,
+      }),
     });
 
-    if (!res.ok) throw new Error('Failed to unfollow user');
+    if (!res.ok) throw new Error('GraphQL mutation failed');
+
+    const result = await res.json();
+
+    if (result.errors) {
+      throw new Error(result.errors[0].message);
+    }
+
+    return result.data.updateFollowThreshold;
   }
 
-  async getFollowing(): Promise<UserFollow[]> {
-    const res = await fetch(`${API_BASE}/user/following`, {
+  async getFollowingGraphQL(): Promise<UserFollow[]> {
+    const graphqlQuery = `
+      query {
+        myFollowing {
+          id
+          user {
+            id
+            username
+            email
+            role
+          }
+          minimumRatingThreshold
+          createdAt
+        }
+      }
+    `;
+
+    const res = await fetch(`${API_BASE}/graphql`, {
+      method: 'POST',
       headers: this.getHeaders(),
+      body: JSON.stringify({
+        query: graphqlQuery,
+      }),
     });
 
-    if (!res.ok) throw new Error('Failed to fetch following');
-    return res.json();
+    if (!res.ok) throw new Error('GraphQL query failed');
+
+    const result = await res.json();
+
+    if (result.errors) {
+      throw new Error(result.errors[0].message);
+    }
+
+    return result.data.myFollowing;
   }
 
-  async getFollowers(): Promise<User[]> {
-    const res = await fetch(`${API_BASE}/user/followers`, {
+  async getFollowersGraphQL(): Promise<User[]> {
+    const graphqlQuery = `
+      query {
+        myFollowers {
+          id
+          username
+          email
+          role
+          createdAt
+          ratingsCount
+        }
+      }
+    `;
+
+    const res = await fetch(`${API_BASE}/graphql`, {
+      method: 'POST',
       headers: this.getHeaders(),
+      body: JSON.stringify({
+        query: graphqlQuery,
+      }),
     });
 
-    if (!res.ok) throw new Error('Failed to fetch followers');
-    return res.json();
+    if (!res.ok) throw new Error('GraphQL query failed');
+
+    const result = await res.json();
+
+    if (result.errors) {
+      throw new Error(result.errors[0].message);
+    }
+
+    return result.data.myFollowers;
   }
 
   // Admin endpoints
@@ -542,96 +994,164 @@ class ApiClient {
     return res.json();
   }
 
-  async getMyListGenres(params?: {
+  async getMyListGenresGraphQL(params?: {
     searchQuery?: string;
     categories?: string[];
   }): Promise<Genre[]> {
-    const searchParams = new URLSearchParams();
+    const graphqlQuery = `
+      query MyListGenres($input: MyListFiltersInput!) {
+        myListGenres(input: $input) {
+          id
+          name
+        }
+      }
+    `;
 
-    if (params?.searchQuery) {
-      searchParams.append('searchQuery', params.searchQuery);
+    const variables = {
+      input: {
+        searchQuery: params?.searchQuery,
+        categories: params?.categories,
+      },
+    };
+
+    const res = await fetch(`${API_BASE}/graphql`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({
+        query: graphqlQuery,
+        variables,
+      }),
+    });
+
+    if (!res.ok) throw new Error('GraphQL query failed');
+
+    const result = await res.json();
+
+    if (result.errors) {
+      throw new Error(result.errors[0].message);
     }
 
-    params?.categories?.forEach(cat =>
-      searchParams.append('categories', cat)
-    );
-
-    const res = await fetch(
-      `${API_BASE}/user/my-list/genres?${searchParams.toString()}`,
-      { headers: this.getHeaders() }
-    );
-
-    if (!res.ok) throw new Error('Failed to fetch genres');
-    return res.json();
+    return result.data.myListGenres;
   }
 
-  async getMyListPlatforms(params?: {
+  async getMyListPlatformsGraphQL(params?: {
     searchQuery?: string;
     categories?: string[];
   }): Promise<Platform[]> {
-    const searchParams = new URLSearchParams();
+    const graphqlQuery = `
+      query MyListPlatforms($input: MyListFiltersInput!) {
+        myListPlatforms(input: $input) {
+          id
+          name
+        }
+      }
+    `;
 
-    if (params?.searchQuery) {
-      searchParams.append('searchQuery', params.searchQuery);
+    const variables = {
+      input: {
+        searchQuery: params?.searchQuery,
+        categories: params?.categories,
+      },
+    };
+
+    const res = await fetch(`${API_BASE}/graphql`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({
+        query: graphqlQuery,
+        variables,
+      }),
+    });
+
+    if (!res.ok) throw new Error('GraphQL query failed');
+
+    const result = await res.json();
+
+    if (result.errors) {
+      throw new Error(result.errors[0].message);
     }
 
-    params?.categories?.forEach(cat =>
-      searchParams.append('categories', cat)
-    );
-
-    const res = await fetch(
-      `${API_BASE}/user/my-list/platforms?${searchParams.toString()}`,
-      { headers: this.getHeaders() }
-    );
-
-    if (!res.ok) throw new Error('Failed to fetch platforms');
-    return res.json();
+    return result.data.myListPlatforms;
   }
 
-  async getAvailableMediaGenres(params?: {
-  query?: string;
-  categories?: string[];
-}): Promise<Genre[]> {
-  const searchParams = new URLSearchParams();
+  async getAvailableMediaGenresGraphQL(params?: {
+    query?: string;
+    categories?: string[];
+  }): Promise<Genre[]> {
+    const graphqlQuery = `
+      query AvailableMediaGenres($input: AvailableFiltersInput!) {
+        availableMediaGenres(input: $input) {
+          id
+          name
+        }
+      }
+    `;
 
-  if (params?.query) {
-    searchParams.append('query', params.query);
+    const variables = {
+      input: {
+        query: params?.query || "",
+        categories: params?.categories,
+      },
+    };
+
+    const res = await fetch(`${API_BASE}/graphql`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({
+        query: graphqlQuery,
+        variables,
+      }),
+    });
+
+    if (!res.ok) throw new Error('GraphQL query failed');
+
+    const result = await res.json();
+
+    if (result.errors) {
+      throw new Error(result.errors[0].message);
+    }
+
+    return result.data.availableMediaGenres;
   }
 
-  params?.categories?.forEach(cat =>
-    searchParams.append('categories', cat)
-  );
-
-  const res = await fetch(
-    `${API_BASE}/user/media-items/available-genres?${searchParams.toString()}`,
-    { headers: this.getHeaders() }
-  );
-
-  if (!res.ok) throw new Error('Failed to fetch genres');
-  return res.json();
-}
-
-  async getAvailableMediaPlatforms(params?: {
+  async getAvailableMediaPlatformsGraphQL(params?: {
     query?: string;
     categories?: string[];
   }): Promise<Platform[]> {
-    const searchParams = new URLSearchParams();
+    const graphqlQuery = `
+      query AvailableMediaPlatforms($input: AvailableFiltersInput!) {
+        availableMediaPlatforms(input: $input) {
+          id
+          name
+        }
+      }
+    `;
 
-    if (params?.query) {
-      searchParams.append('query', params.query);
+    const variables = {
+      input: {
+        query: params?.query || "",
+        categories: params?.categories,
+      },
+    };
+
+    const res = await fetch(`${API_BASE}/graphql`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({
+        query: graphqlQuery,
+        variables,
+      }),
+    });
+
+    if (!res.ok) throw new Error('GraphQL query failed');
+
+    const result = await res.json();
+
+    if (result.errors) {
+      throw new Error(result.errors[0].message);
     }
 
-    params?.categories?.forEach(cat =>
-      searchParams.append('categories', cat)
-    );
-
-    const res = await fetch(
-      `${API_BASE}/user/media-items/available-platforms?${searchParams.toString()}`,
-      { headers: this.getHeaders() }
-    );
-
-    if (!res.ok) throw new Error('Failed to fetch platforms');
-    return res.json();
+    return result.data.availableMediaPlatforms;
   }
 }
 

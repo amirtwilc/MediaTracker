@@ -6,8 +6,11 @@ import com.amir.mediatracker.dto.request.GenreRequest;
 import com.amir.mediatracker.dto.request.MediaItemRequest;
 import com.amir.mediatracker.dto.request.PlatformRequest;
 import com.amir.mediatracker.dto.response.*;
+import com.amir.mediatracker.exception.BadRequestException;
 import com.amir.mediatracker.service.AdminService;
 import com.amir.mediatracker.service.AsyncBatchService;
+import com.amir.mediatracker.service.FileStorageService;
+import io.micrometer.common.util.StringUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.batch.core.JobParameters;
@@ -19,34 +22,41 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 
+@LogAround
 @RestController
-@RequestMapping("/media-tracker/admin")
+@RequestMapping("/admin")
 @PreAuthorize("hasRole('ADMIN')")
 @RequiredArgsConstructor
 public class AdminController {
 
     private final AdminService adminService;
     private final AsyncBatchService asyncBatchService;
+    private final FileStorageService fileStorageService;
 
     /**
      * Handles upload of CSV file and activated Spring Batch.
      * Job is performed asynchronously for non-blocking behavior.
-     * A unique correlationId key is generated and will be mapped later to the jobExecutionId
+     * A unique correlationId key is generated and will be mapped later to a jobExecutionId
      * @param file The CSV file to parse
      * @return correlationId and status
      * @throws IOException if file was not able to be temporarily saved to system
      */
-    @LogAround
     @PostMapping("/media-items/import-csv")
     public ResponseEntity<ImportStatusResponse> importCsv(
             @RequestParam("file") MultipartFile file) throws IOException {
 
-        String tempFilePath = saveTempFile(file);
+        if (file.isEmpty()) {
+            throw new BadRequestException("Uploaded file is empty");
+        }
+
+        if (StringUtils.isBlank(file.getOriginalFilename()) ||
+                !file.getOriginalFilename().toLowerCase().endsWith(".csv")) {
+            throw new BadRequestException("Only CSV files are supported");
+        }
+
+        String tempFilePath = fileStorageService.storeTempFile(file);
 
         long correlationId = System.currentTimeMillis();
 
@@ -69,7 +79,6 @@ public class AdminController {
      * @param correlationId The key given by /import-csv endpoint
      * @return The job current status, along with the amount of reads, writes and skips performed
      */
-    @LogAround
     @GetMapping("/media-items/import-status/{correlationId}")
     public ResponseEntity<JobStatusResponse> getJobStatus(
             @PathVariable Long correlationId) {
@@ -77,35 +86,30 @@ public class AdminController {
     }
 
     // Get all genres
-    @LogAround
     @GetMapping("/genres")
     public ResponseEntity<List<GenreResponse>> getAllGenres() {
         return ResponseEntity.ok(adminService.getAllGenres());
     }
 
     // Get all platforms
-    @LogAround
     @GetMapping("/platforms")
     public ResponseEntity<List<PlatformResponse>> getAllPlatforms() {
         return ResponseEntity.ok(adminService.getAllPlatforms());
     }
 
     // Create genre
-    @LogAround
     @PostMapping("/genres")
     public ResponseEntity<GenreResponse> createGenre(@RequestBody @Valid GenreRequest request) {
         return ResponseEntity.ok(adminService.createGenre(request));
     }
 
     // Create platform
-    @LogAround
     @PostMapping("/platforms")
     public ResponseEntity<PlatformResponse> createPlatform(@RequestBody @Valid PlatformRequest request) {
         return ResponseEntity.ok(adminService.createPlatform(request));
     }
 
     // Create media item
-    @LogAround
     @PostMapping("/media-items")
     public ResponseEntity<MediaItemResponse> createMediaItem(
             @RequestBody @Valid MediaItemRequest request) {
@@ -113,7 +117,6 @@ public class AdminController {
     }
 
     // Update media item
-    @LogAround
     @PutMapping("/media-items/{id}")
     public ResponseEntity<MediaItemResponse> updateMediaItem(
             @PathVariable Long id,
@@ -122,7 +125,6 @@ public class AdminController {
     }
 
     // Delete media item
-    @LogAround
     @DeleteMapping("/media-items/{id}")
     public ResponseEntity<Void> deleteMediaItem(@PathVariable Long id) {
         adminService.deleteMediaItem(id);
@@ -130,19 +132,10 @@ public class AdminController {
     }
 
     // Get all media items (paginated)
-    @LogAround
     @GetMapping("/media-items")
     public ResponseEntity<Page<MediaItemResponse>> getAllMediaItems(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         return ResponseEntity.ok(adminService.getAllMediaItems(page, size));
-    }
-
-    private String saveTempFile(MultipartFile file) throws IOException {
-        String tempDir = System.getProperty("java.io.tmpdir");
-        String fileName = "upload_" + System.currentTimeMillis() + "_" + file.getOriginalFilename();
-        Path filePath = Paths.get(tempDir, fileName);
-        Files.write(filePath, file.getBytes());
-        return filePath.toString();
     }
 }

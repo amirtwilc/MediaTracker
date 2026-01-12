@@ -340,7 +340,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ userId, onBack }) => {
       // Fetch current threshold if following
       if (data.isFollowing) {
         try {
-          const followData = await api.getFollowing();
+          const followData = await api.getFollowingGraphQL();
           const followRelation = followData.find(f => f.user.id === userId);
           if (followRelation) {
             setCurrentThreshold(followRelation.minimumRatingThreshold);
@@ -367,7 +367,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ userId, onBack }) => {
 
   const handleUpdateThreshold = async () => {
     try {
-      await api.updateFollowThreshold(userId, newThreshold);
+      await api.updateFollowThresholdGraphQL(userId, newThreshold);
       setCurrentThreshold(newThreshold);
       setEditingThreshold(false);
       await loadProfile();
@@ -378,7 +378,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ userId, onBack }) => {
 
   const handleFollowConfirm = async (threshold: number | null) => {
     try {
-      await api.followUser(userId, threshold === null ? 0 : threshold);
+      await api.followUserGraphQL(userId, threshold === null ? 0 : threshold);
       setIsFollowing(true);
       loadProfile();
       setFollowModal({ show: false });
@@ -393,7 +393,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ userId, onBack }) => {
 
   const handleUnfollowConfirm = async () => {
     try {
-      await api.unfollowUser(userId);
+      await api.unfollowUserGraphQL(userId);
       setIsFollowing(false);
       setCurrentThreshold(null);
       setUnfollowConfirm(false);

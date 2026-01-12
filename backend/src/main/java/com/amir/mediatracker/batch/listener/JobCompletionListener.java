@@ -40,7 +40,7 @@ public class JobCompletionListener implements JobExecutionListener {
                     jobExecution.getExitStatus());
 
             jobExecution.getAllFailureExceptions()
-                    .forEach(ex -> log.error("Job failure exception", ex));
+                    .forEach(ex -> log.error("Job {} failure exception", jobExecution.getId(), ex));
         }
     }
 }

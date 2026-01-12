@@ -120,11 +120,11 @@ export const SearchMedia: React.FC = () => {
       const categories = filterCategories.length > 0 ? filterCategories : undefined;
 
       const [genresData, platformsData] = await Promise.all([
-        api.getAvailableMediaGenres({
+        api.getAvailableMediaGenresGraphQL({
           query: debouncedQuery || undefined,
           categories
         }),
-        api.getAvailableMediaPlatforms({
+        api.getAvailableMediaPlatformsGraphQL({
           query: debouncedQuery || undefined,
           categories
         }),
@@ -164,8 +164,8 @@ export const SearchMedia: React.FC = () => {
     const categories = filterCategories.length > 0 ? filterCategories : undefined;
 
     if (paginationMode === 'offset' && sortConfig) {
-      // Use sorted endpoint with offset pagination
-      const response = await api.searchMediaItemsSorted({
+      // Use GraphQL sorted endpoint with offset pagination
+      const response = await api.searchMediaItemsSortedGraphQL({
         query: debouncedQuery || '',
         categories,
         genreIds,
@@ -183,8 +183,8 @@ export const SearchMedia: React.FC = () => {
         totalCount: response.totalElements,
       };
     } else {
-      // Use cursor endpoint (unsorted, default by name)
-      const response = await api.searchMediaItemsCursor({
+      // Use GraphQL cursor endpoint (unsorted, default by name)
+      const response = await api.searchMediaItemsGraphQL({
         query: debouncedQuery || '',
         categories,
         genreIds,
@@ -375,9 +375,10 @@ export const SearchMedia: React.FC = () => {
 
   const handleAdd = async (mediaItemId: number) => {
     try {
-      const result = await api.addToMyList(mediaItemId);
+      const result = await api.addToMyListGraphQL(mediaItemId);
       setEditingAddedId(mediaItemId);
       setEditState({
+        id: result.id, // Store the list item ID
         experienced: false,
         wishToReexperience: false,
         rating: undefined,
@@ -399,13 +400,10 @@ export const SearchMedia: React.FC = () => {
   };
 
   const handleSaveUpdate = async (mediaItemId: number) => {
-    // Find the item's list ID from backend by getting user list
     try {
-      const userList = await api.getMyMediaList(0, 1000);
-      const listItem = userList.find(item => item.mediaItem.id === mediaItemId);
-
-      if (listItem) {
-        await api.updateMyListItem(listItem.id, editState);
+      // Use the stored list item ID from editState
+      if (editState.id) {
+        await api.updateMyListItemGraphQL(editState.id, editState);
         setEditingAddedId(null);
         setEditState({});
       }

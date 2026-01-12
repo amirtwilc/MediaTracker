@@ -3,7 +3,6 @@ import { Upload, X, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { Genre, Platform } from '../../types';
 import { api } from '../../services/api';
 import { UpdateMediaItem } from './UpdateMediaItem';
-import { log } from 'console';
 
 export const AdminPanel: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'create' | 'upload' | 'update'>('create');

@@ -156,6 +156,10 @@ In the next paragraphs I will try to explain my rationale for the main component
 * Message Queue: Kafka  
   Picked because of my strong experience and is an important technology to demonstrate knowledge of.
 
+* API paradigm: REST and GraphQL
+  The backend primarily exposes REST endpoints, which fit the project’s requirements for full-resource responses.  
+  GraphQL was also integrated experimentally (via UserQuery and UserMutation classes) to explore its usage and compare approaches.
+
 * Frontend: React  
   React was used to provide a modern, interactive UI. While frontend development was not the primary focus of this project, it allowed me to effectively showcase backend capabilities and overall system design.
 
