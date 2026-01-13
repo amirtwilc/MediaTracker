@@ -12,7 +12,9 @@ import com.amir.mediatracker.service.AsyncBatchService;
 import com.amir.mediatracker.service.FileStorageService;
 import io.micrometer.common.util.StringUtils;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
+import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.JobParameters;
 import org.springframework.batch.core.JobParametersBuilder;
 import org.springframework.data.domain.Page;
@@ -36,7 +38,7 @@ public class AdminController {
     private final FileStorageService fileStorageService;
 
     /**
-     * Handles upload of CSV file and activated Spring Batch.
+     * Handles upload of CSV file and activates Spring Batch.
      * Job is performed asynchronously for non-blocking behavior.
      * A unique correlationId key is generated and will be mapped later to a jobExecutionId
      * @param file The CSV file to parse
@@ -69,7 +71,7 @@ public class AdminController {
         return ResponseEntity.ok(
                 ImportStatusResponse.builder()
                         .correlationId(correlationId)
-                        .status("STARTING")
+                        .status(BatchStatus.STARTING.toString())
                         .build()
         );
     }
@@ -80,21 +82,19 @@ public class AdminController {
      * @return The job current status, along with the amount of reads, writes and skips performed
      */
     @GetMapping("/media-items/import-status/{correlationId}")
-    public ResponseEntity<JobStatusResponse> getJobStatus(
-            @PathVariable Long correlationId) {
-        return ResponseEntity.ok(adminService.getJobStatus(correlationId));
+    public JobStatusResponse getJobStatus(
+            @PathVariable @NotNull Long correlationId) {
+        return adminService.getJobStatus(correlationId);
     }
 
-    // Get all genres
     @GetMapping("/genres")
-    public ResponseEntity<List<GenreResponse>> getAllGenres() {
-        return ResponseEntity.ok(adminService.getAllGenres());
+    public List<GenreResponse> getAllGenres() {
+        return adminService.getAllGenres();
     }
 
-    // Get all platforms
     @GetMapping("/platforms")
-    public ResponseEntity<List<PlatformResponse>> getAllPlatforms() {
-        return ResponseEntity.ok(adminService.getAllPlatforms());
+    public List<PlatformResponse> getAllPlatforms() {
+        return adminService.getAllPlatforms();
     }
 
     // Create genre

@@ -1,12 +1,19 @@
 package com.amir.mediatracker.controller;
 
+import com.amir.mediatracker.entity.Genre;
+import com.amir.mediatracker.entity.Platform;
+import com.amir.mediatracker.repository.GenreRepository;
+import com.amir.mediatracker.repository.PlatformRepository;
 import com.amir.mediatracker.security.JwtTokenProvider;
 import com.amir.mediatracker.service.AsyncBatchService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
+import org.springframework.batch.core.BatchStatus;
+import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.JobParameters;
+import org.springframework.batch.core.explore.JobExplorer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -17,19 +24,22 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.nio.file.Path;
-import java.util.Collections;
+import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -46,8 +56,17 @@ class AdminControllerIT {
     @Autowired
     private JwtTokenProvider jwtTokenProvider;
 
+    @Autowired
+    private GenreRepository genreRepository;
+
+    @Autowired
+    private PlatformRepository platformRepository;
+
     @MockitoBean
     private AsyncBatchService asyncBatchService;
+
+    @MockitoBean
+    private JobExplorer jobExplorer;
 
     @TempDir
     Path tempDir;
@@ -66,7 +85,7 @@ class AdminControllerIT {
                 );
 
         Authentication adminAuth = new UsernamePasswordAuthenticationToken(
-                adminUser,  // Pass UserDetails object, not String
+                adminUser,
                 null,
                 adminUser.getAuthorities()
         );
@@ -81,11 +100,96 @@ class AdminControllerIT {
                 );
 
         Authentication userAuth = new UsernamePasswordAuthenticationToken(
-                regularUser,  // Pass UserDetails object, not String
+                regularUser,
                 null,
                 regularUser.getAuthorities()
         );
         userToken = jwtTokenProvider.generateToken(userAuth);
+    }
+
+    @Test
+    void getAllPlatforms_shouldReturnEmptyResult() throws Exception {
+        //Arrange
+        platformRepository.deleteAll();
+        // Act & Assert
+        mockMvc.perform(get("/admin/platforms")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
+    }
+
+    @Test
+    void getAllPlatforms_shouldReturnAllResults() throws Exception {
+        //Arrange
+        savePlatforms(List.of("Netflix", "Disney+", "HBO Max", "PC", "Playstation 5"));
+        // Act & Assert
+        mockMvc.perform(get("/admin/platforms")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(MockMvcResultMatchers.jsonPath("$.length()").value(5))
+                .andExpect(jsonPath("$[*].id").isNotEmpty())
+                .andExpect(jsonPath("$[*].name").isNotEmpty());
+    }
+
+    @Test
+    void getAllGenres_shouldReturnEmptyResult() throws Exception {
+        //Arrange
+        genreRepository.deleteAll();
+        // Act & Assert
+        mockMvc.perform(get("/admin/genres")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
+    }
+
+    @Test
+    void getAllGenres_shouldReturnAllResults() throws Exception {
+        //Arrange
+        saveGenres(List.of("Action", "Drama", "Documentary"));
+        // Act & Assert
+        mockMvc.perform(get("/admin/genres")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(MockMvcResultMatchers.jsonPath("$.length()").value(3))
+                .andExpect(jsonPath("$[*].id").isNotEmpty())
+                .andExpect(jsonPath("$[*].name").isNotEmpty());
+    }
+
+    @Test
+    void getJobStatus_shouldReturn200AndCompleted() throws Exception {
+        //Arrange
+        when(asyncBatchService.resolveJobExecutionId(any())).thenReturn(1L);
+        JobExecution execution = new JobExecution(1L);
+        execution.setStatus(BatchStatus.COMPLETED);
+        when(jobExplorer.getJobExecution(any())).thenReturn(execution);
+        // Act & Assert
+        mockMvc.perform(get("/admin/media-items/import-status/1")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value(BatchStatus.COMPLETED.toString()));
+    }
+
+    @Test
+    void getJobStatus_shouldReturn200AndStarting() throws Exception {
+        // Arrange
+        when(asyncBatchService.resolveJobExecutionId(any())).thenReturn(null);
+        verify(jobExplorer, times(0)).getJobExecution(any());
+        when(jobExplorer.getJobExecution(any())).thenReturn(null);
+        // Act & Assert
+        mockMvc.perform(get("/admin/media-items/import-status/1")
+                .header("Authorization", "Bearer " + adminToken))
+                .andExpect(jsonPath("$.status").value(BatchStatus.STARTING.toString()));
+    }
+
+    @Test
+    void getJobStatus_shouldReturn404() throws Exception {
+        // Arrange
+        when(asyncBatchService.resolveJobExecutionId(any())).thenReturn(1L);
+        when(jobExplorer.getJobExecution(any())).thenReturn(null);
+        // Act & Assert
+        mockMvc.perform(get("/admin/media-items/import-status/1")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isNotFound());
     }
 
     @Test
@@ -292,5 +396,25 @@ class AdminControllerIT {
         assertThat(filePath).isNotNull();
         assertThat(filePath).contains(System.getProperty("java.io.tmpdir"));
         assertThat(filePath).endsWith(".csv");
+    }
+
+    private void saveGenres(List<String> genreNames) {
+        Set<Genre> genreList = new HashSet<>();
+        genreNames.forEach(genreName -> {
+            Genre genre = new Genre();
+            genre.setName(genreName);
+            genreList.add(genre);
+        });
+        genreRepository.saveAll(genreList);
+    }
+
+    private void savePlatforms(List<String> platformNames) {
+        Set<Platform> platformList = new HashSet<>();
+        platformNames.forEach(genreName -> {
+            Platform platform = new Platform();
+            platform.setName(genreName);
+            platformList.add(platform);
+        });
+        platformRepository.saveAll(platformList);
     }
 }

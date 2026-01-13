@@ -19,6 +19,7 @@ import com.amir.mediatracker.repository.MediaItemRepository;
 import com.amir.mediatracker.repository.PlatformRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.explore.JobExplorer;
 import org.springframework.data.domain.Page;
@@ -53,13 +54,13 @@ public class AdminService {
     public List<GenreResponse> getAllGenres() {
         return genreRepository.findAll().stream()
                 .map(this::mapGenreToResponse)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     public List<PlatformResponse> getAllPlatforms() {
         return platformRepository.findAll().stream()
                 .map(this::mapPlatformToResponse)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @Transactional
@@ -185,7 +186,7 @@ public class AdminService {
             log.warn("getJobStatus() was called with correlationId={}, but no map to jobExecutionId was found", correlationId);
             return JobStatusResponse.builder()
                     .correlationId(correlationId)
-                    .status("STARTING")
+                    .status(BatchStatus.STARTING.toString())
                     .build();
         }
 
