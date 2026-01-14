@@ -6,9 +6,12 @@ import com.amir.mediatracker.exception.ResourceNotFoundException;
 import com.amir.mediatracker.repository.MediaItemRepository;
 import com.amir.mediatracker.repository.NotificationRepository;
 import com.amir.mediatracker.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.weaver.ast.Not;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,19 +22,26 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-@Service
 @Slf4j
+@Service
+@RequiredArgsConstructor
 public class NotificationService {
 
-    @Autowired
-    private NotificationRepository notificationRepository;
+    @Value("${app.notification.fetch-limit}")
+    private int fetchLimit;
 
-    @Autowired
-    private UserRepository userRepository;
+    private final NotificationRepository notificationRepository;
+    private final UserRepository userRepository;
+    private final MediaItemRepository mediaItemRepository;
 
-    @Autowired
-    private MediaItemRepository mediaItemRepository;
-
+    /**
+     * Create a notification for a user
+     * @param userId The id of the user that will see this notification
+     * @param message The message displayed as part of this notification
+     * @param mediaItemId The media item id for which this notification was created
+     * @param rating The rating That caused this notification
+     * @param ratedByUserId The id of the user that rated the media item
+     */
     @Transactional
     public void createNotification(Long userId, String message,
                                    Long mediaItemId, Short rating, Long ratedByUserId) {
@@ -58,21 +68,35 @@ public class NotificationService {
         log.info("Created notification for user {}: {}", userId, message);
     }
 
+    /**
+     * Get notifications for a user, up to a default limit.
+     * Fetching notifications and then filtering unread, so to not fetch unread notification that are beyond the limit.
+     * For example: limit is 10, and there are 20 notifications. All recent 10 notifications are read, and 10 are unread.
+     * In this case, if onlyUnread is true, no notifications will be returned.
+     * @param userId The id of the user for whom to fetch notification
+     * @param onlyUnread Whether all notifications are required, or only unread
+     * @return All notifications for the user, up to the default limit
+     */
     public List<NotificationResponse> getNotifications(Long userId, boolean onlyUnread) {
-        List<Notification> notifications;
 
+        List<Notification> notifications = notificationRepository.findByUserIdOrderByCreatedAtDesc(userId, Limit.of(fetchLimit));
         if (onlyUnread) {
-            notifications = notificationRepository.findByUserIdAndIsReadFalse(userId);
-        } else {
-            notifications = notificationRepository.findByUserId(userId);
+            notifications = notifications.stream()
+                    .filter(n -> !n.getIsRead())
+                    .toList();
         }
 
         return notifications.stream()
-                .sorted(Comparator.comparing(Notification::getCreatedAt).reversed())
                 .map(this::mapToResponse)
-                .collect(Collectors.toList());
+                .toList();
     }
 
+    /**
+     * Mark a notification as read
+     * @param userId The id of the user for whom to fetch notification
+     * @param notificationId The id of the notification to fetch
+     * @return The notification that was marked as read
+     */
     @Transactional
     public NotificationResponse markAsRead(Long userId, Long notificationId) {
         Notification notification = notificationRepository
@@ -80,21 +104,32 @@ public class NotificationService {
                 .orElseThrow(() -> new ResourceNotFoundException("Notification not found"));
 
         notification.setIsRead(true);
-        Notification saved = notificationRepository.save(notification);
-        return mapToResponse(saved);
+        return mapToResponse(notification);
     }
 
+    /**
+     * Mark all visible notifications as read.
+     * Since only latest notifications are visible (up to limit), only those are marked as read.
+     * @param userId The id of the user for whom to fetch notification
+     */
     @Transactional
     public void markAllAsRead(Long userId) {
         List<Notification> notifications = notificationRepository
-                .findByUserIdAndIsReadFalse(userId);
+                .findByUserIdAndIsReadFalseOrderByCreatedAtDesc(userId, Limit.of(fetchLimit));
 
         notifications.forEach(n -> n.setIsRead(true));
-        notificationRepository.saveAll(notifications);
     }
 
+    /**
+     * Fetch the count of all unread notifications, up to the default limit
+     * @param userId The id of the user for whom to fetch notification
+     * @return The count of unread notifications
+     */
     public long getUnreadCount(Long userId) {
-        return notificationRepository.countByUserIdAndIsReadFalse(userId);
+        return notificationRepository.findByUserIdOrderByCreatedAtDesc(userId, Limit.of(fetchLimit))
+                .stream()
+                .filter(n -> !n.getIsRead())
+                .count();
     }
 
     private NotificationResponse mapToResponse(Notification notification) {

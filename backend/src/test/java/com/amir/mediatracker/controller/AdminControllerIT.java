@@ -30,6 +30,7 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.User;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -56,12 +57,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
-@AutoConfigureMockMvc
 @Testcontainers
+@AutoConfigureMockMvc
 class AdminControllerIT {
-
-    @Autowired
-    private ObjectMapper objectMapper;
 
     @Container
     @ServiceConnection
@@ -72,6 +70,9 @@ class AdminControllerIT {
 
     @Autowired
     private JwtTokenProvider jwtTokenProvider;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @Autowired
     private GenreRepository genreRepository;
@@ -97,8 +98,8 @@ class AdminControllerIT {
     @BeforeEach
     void setUp() {
         // Create admin UserDetails
-        org.springframework.security.core.userdetails.User adminUser =
-                new org.springframework.security.core.userdetails.User(
+        User adminUser =
+                new User(
                         "admin",
                         "password",
                         Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN"))
@@ -127,7 +128,6 @@ class AdminControllerIT {
         userToken = jwtTokenProvider.generateToken(userAuth);
 
         //clear DB
-
         genreRepository.deleteAll();
         platformRepository.deleteAll();
         mediaItemRepository.deleteAll();

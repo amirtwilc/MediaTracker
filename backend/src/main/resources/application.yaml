@@ -86,4 +86,6 @@ app:
   batch:
     chunk-size: 10
     skip-limit: 100
+  notification:
+    fetch-limit: 50
 
