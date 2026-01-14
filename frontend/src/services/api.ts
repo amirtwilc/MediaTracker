@@ -873,21 +873,6 @@ class ApiClient {
     return res.json();
   }
 
-  async getAllMediaItems(page = 0, size = 200): Promise<{
-    content: MediaItem[];
-    totalPages: number;
-    totalElements: number;
-    number: number;
-    size: number;
-  }> {
-    const res = await fetch(`${API_BASE}/admin/media-items?page=${page}&size=${size}`, {
-      headers: this.getHeaders(),
-    });
-
-    if (!res.ok) throw new Error('Failed to fetch media items');
-    return res.json();
-  }
-
   async createMediaItem(data: any): Promise<MediaItem> {
     const res = await fetch(`${API_BASE}/admin/media-items`, {
       method: 'POST',

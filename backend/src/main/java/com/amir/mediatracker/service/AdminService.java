@@ -12,6 +12,7 @@ import com.amir.mediatracker.dto.response.PlatformResponse;
 import com.amir.mediatracker.entity.Genre;
 import com.amir.mediatracker.entity.MediaItem;
 import com.amir.mediatracker.entity.Platform;
+import com.amir.mediatracker.exception.ConflictException;
 import com.amir.mediatracker.exception.DuplicateResourceException;
 import com.amir.mediatracker.exception.ResourceNotFoundException;
 import com.amir.mediatracker.repository.GenreRepository;
@@ -89,7 +90,6 @@ public class AdminService {
 
     @Transactional
     public MediaItemResponse createMediaItem(MediaItemRequest request) {
-        // Check for duplicates
         Optional<MediaItem> existing = mediaItemRepository
                 .findByNameAndCategory(request.getName(), request.getCategory());
 
@@ -99,30 +99,9 @@ public class AdminService {
         }
 
         MediaItem item = new MediaItem();
-        item.setCategory(request.getCategory());
-        item.setName(request.getName());
-        item.setYear(request.getYear());
+        applyRequestToEntity(item, request);
 
-        // Fetch and set genres
-        Set<Genre> genres = new HashSet<>();
-        for (Long genreId : request.getGenreIds()) {
-            Genre genre = genreRepository.findById(genreId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Genre not found: " + genreId));
-            genres.add(genre);
-        }
-        item.setGenres(genres);
-
-        // Fetch and set platforms
-        Set<Platform> platforms = new HashSet<>();
-        for (Long platformId : request.getPlatformIds()) {
-            Platform platform = platformRepository.findById(platformId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Platform not found: " + platformId));
-            platforms.add(platform);
-        }
-        item.setPlatforms(platforms);
-
-        MediaItem saved = mediaItemRepository.save(item);
-        return mapToResponse(saved);
+        return mapToResponse(mediaItemRepository.save(item));
     }
 
     @Transactional
@@ -130,32 +109,13 @@ public class AdminService {
         MediaItem item = mediaItemRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Media item not found"));
 
-        item.setCategory(request.getCategory());
-        item.setName(request.getName());
-        item.setYear(request.getYear());
-
-        // Update genres
-        Set<Genre> genres = new HashSet<>();
-        for (Long genreId : request.getGenreIds()) {
-            Genre genre = genreRepository.findById(genreId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Genre not found: " + genreId));
-            genres.add(genre);
+        if (!item.getName().equalsIgnoreCase(request.getName())
+                || !item.getCategory().equals(request.getCategory())) {
+            throw new ConflictException("Request media item does not correlate to existing media item by id");
         }
-        item.setGenres(genres);
 
-        // Update platforms
-        Set<Platform> platforms = new HashSet<>();
-        for (Long platformId : request.getPlatformIds()) {
-            Platform platform = platformRepository.findById(platformId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Platform not found: " + platformId));
-            platforms.add(platform);
-        }
-        item.setPlatforms(platforms);
-
-        item.setUpdatedAt(LocalDateTime.now());
-
-        MediaItem saved = mediaItemRepository.save(item);
-        return mapToResponse(saved);
+        applyRequestToEntity(item, request);
+        return mapToResponse(mediaItemRepository.save(item));
     }
 
     @Transactional
@@ -164,12 +124,6 @@ public class AdminService {
             throw new ResourceNotFoundException("Media item not found");
         }
         mediaItemRepository.deleteById(id);
-    }
-
-    public Page<MediaItemResponse> getAllMediaItems(int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("name").ascending());
-        Page<MediaItem> items = mediaItemRepository.findAll(pageable);
-        return items.map(this::mapToResponse);
     }
 
     /**
@@ -243,5 +197,30 @@ public class AdminService {
                 .id(platform.getId())
                 .name(platform.getName())
                 .build();
+    }
+
+    private void applyRequestToEntity(MediaItem item, MediaItemRequest request) {
+        item.setCategory(request.getCategory());
+        item.setName(request.getName());
+        item.setYear(request.getYear());
+
+        item.setGenres(resolveGenres(request.getGenreIds()));
+        item.setPlatforms(resolvePlatforms(request.getPlatformIds()));
+    }
+
+    private Set<Genre> resolveGenres(Set<Long> ids) {
+        List<Genre> genres = genreRepository.findAllById(ids);
+        if (genres.size() != ids.size()) {
+            throw new ResourceNotFoundException("One or more genres not found");
+        }
+        return new HashSet<>(genres);
+    }
+
+    private Set<Platform> resolvePlatforms(Set<Long> ids) {
+        List<Platform> platforms = platformRepository.findAllById(ids);
+        if (platforms.size() != ids.size()) {
+            throw new ResourceNotFoundException("One or more platforms not found");
+        }
+        return new HashSet<>(platforms);
     }
 }

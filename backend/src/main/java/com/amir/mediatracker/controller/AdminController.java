@@ -18,6 +18,7 @@ import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.JobParameters;
 import org.springframework.batch.core.JobParametersBuilder;
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -97,31 +98,30 @@ public class AdminController {
         return adminService.getAllPlatforms();
     }
 
-    // Create genre
     @PostMapping("/genres")
-    public ResponseEntity<GenreResponse> createGenre(@RequestBody @Valid GenreRequest request) {
-        return ResponseEntity.ok(adminService.createGenre(request));
+    public GenreResponse createGenre(@RequestBody @Valid GenreRequest request) {
+        return adminService.createGenre(request);
     }
 
-    // Create platform
     @PostMapping("/platforms")
-    public ResponseEntity<PlatformResponse> createPlatform(@RequestBody @Valid PlatformRequest request) {
-        return ResponseEntity.ok(adminService.createPlatform(request));
+    public PlatformResponse createPlatform(@RequestBody @Valid PlatformRequest request) {
+        return adminService.createPlatform(request);
     }
 
     // Create media item
     @PostMapping("/media-items")
-    public ResponseEntity<MediaItemResponse> createMediaItem(
+    @ResponseStatus(HttpStatus.CREATED)
+    public MediaItemResponse createMediaItem(
             @RequestBody @Valid MediaItemRequest request) {
-        return ResponseEntity.ok(adminService.createMediaItem(request));
+        return adminService.createMediaItem(request);
     }
 
     // Update media item
     @PutMapping("/media-items/{id}")
-    public ResponseEntity<MediaItemResponse> updateMediaItem(
+    public MediaItemResponse updateMediaItem(
             @PathVariable Long id,
             @RequestBody @Valid MediaItemRequest request) {
-        return ResponseEntity.ok(adminService.updateMediaItem(id, request));
+        return adminService.updateMediaItem(id, request);
     }
 
     // Delete media item
@@ -129,13 +129,5 @@ public class AdminController {
     public ResponseEntity<Void> deleteMediaItem(@PathVariable Long id) {
         adminService.deleteMediaItem(id);
         return ResponseEntity.noContent().build();
-    }
-
-    // Get all media items (paginated)
-    @GetMapping("/media-items")
-    public ResponseEntity<Page<MediaItemResponse>> getAllMediaItems(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        return ResponseEntity.ok(adminService.getAllMediaItems(page, size));
     }
 }

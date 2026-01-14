@@ -1,17 +1,12 @@
 package com.amir.mediatracker.dto.request;
 
 import com.amir.mediatracker.dto.Category;
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.*;
 import lombok.Data;
 
 import java.util.Set;
 
 @Data
-@Valid
 public class MediaItemRequest {
     @NotNull(message = "Category is required")
     private Category category;
@@ -20,6 +15,8 @@ public class MediaItemRequest {
     @Size(max = 255)
     private String name;
 
+    @Min(value = 1895, message = "Year must be at least 1895")
+    @Max(value = 3000, message = "Year is not allowed")
     private Integer year;
 
     @NotEmpty(message = "At least one genre is required")

@@ -1,11 +1,19 @@
 package com.amir.mediatracker.controller;
 
+import com.amir.mediatracker.dto.Category;
+import com.amir.mediatracker.dto.request.GenreRequest;
+import com.amir.mediatracker.dto.request.MediaItemRequest;
+import com.amir.mediatracker.dto.request.PlatformRequest;
 import com.amir.mediatracker.entity.Genre;
+import com.amir.mediatracker.entity.MediaItem;
 import com.amir.mediatracker.entity.Platform;
 import com.amir.mediatracker.repository.GenreRepository;
+import com.amir.mediatracker.repository.MediaItemRepository;
 import com.amir.mediatracker.repository.PlatformRepository;
 import com.amir.mediatracker.security.JwtTokenProvider;
 import com.amir.mediatracker.service.AsyncBatchService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -24,20 +32,26 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.nio.file.Path;
-import java.util.*;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.http.MediaType.APPLICATION_JSON_VALUE;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -45,6 +59,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @Testcontainers
 class AdminControllerIT {
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @Container
     @ServiceConnection
@@ -61,6 +78,9 @@ class AdminControllerIT {
 
     @Autowired
     private PlatformRepository platformRepository;
+
+    @Autowired
+    private MediaItemRepository mediaItemRepository;
 
     @MockitoBean
     private AsyncBatchService asyncBatchService;
@@ -105,12 +125,254 @@ class AdminControllerIT {
                 regularUser.getAuthorities()
         );
         userToken = jwtTokenProvider.generateToken(userAuth);
+
+        //clear DB
+
+        genreRepository.deleteAll();
+        platformRepository.deleteAll();
+        mediaItemRepository.deleteAll();
+    }
+
+    @Test
+    void createUpdateAndDeleteMediaItem_shouldSucceed() throws Exception {
+        //Arrange - create
+        Genre genre = new Genre();
+        genre.setName("someGenre");
+        genre = genreRepository.save(genre);
+        Platform platform = new Platform();
+        platform.setName("somePlatform");
+        platform = platformRepository.save(platform);
+        MediaItemRequest request = createMockMediaItemRequest();
+        request.setGenreIds(Set.of(genre.getId()));
+        request.setPlatformIds(Set.of(platform.getId()));
+        // Act & Assert - create
+        MvcResult result = mockMvc.perform(post("/admin/media-items")
+                        .contentType(APPLICATION_JSON_VALUE)
+                        .content(objectMapper.writeValueAsString(request))
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        //Arrange - update
+        Integer id = JsonPath.read(result.getResponse().getContentAsString(), "$.id");
+
+        genre.setName("someOtherGenre");
+        genre = genreRepository.save(genre);
+        platform.setName("someOtherPlatform");
+        platform = platformRepository.save(platform);
+        request.setYear(1990);
+        request.setGenreIds(Set.of(genre.getId()));
+        request.setPlatformIds(Set.of(platform.getId()));
+
+        //Act & Assert - update
+        mockMvc.perform(put("/admin/media-items/" + id)
+                        .contentType(APPLICATION_JSON_VALUE)
+                        .content(objectMapper.writeValueAsString(request))
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk());
+
+        MediaItem mediaItem = mediaItemRepository.findById(Long.valueOf(id)).get();
+        assertEquals(1, mediaItem.getGenres().size());
+        assertTrue(mediaItem.getGenres().stream().map(Genre::getName).toList().contains("someOtherGenre"));
+        assertEquals(1, mediaItem.getPlatforms().size());
+        assertTrue(mediaItem.getPlatforms().stream().map(Platform::getName).toList().contains("someOtherPlatform"));
+        assertEquals(1990, mediaItem.getYear());
+
+        //delete
+        mockMvc.perform(delete("/admin/media-items/" + id)
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isNoContent());
+
+        assertTrue(mediaItemRepository.findById(Long.valueOf(id)).isEmpty());
+    }
+
+    @Test
+    void deleteMediaItem_shouldReturn404_becauseMediaItemNotExist() throws Exception {
+        //Arrange
+        // Act & Assert
+        mockMvc.perform(delete("/admin/media-items/1")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void updateMediaItem_shouldReturn404_becausePlatformNotExist() throws Exception {
+        //Arrange
+        Genre genre = new Genre();
+        genre.setName("someGenre");
+        genre = genreRepository.save(genre);
+        Platform platform = new Platform();
+        platform.setName("somePlatform");
+        platform = platformRepository.save(platform);
+
+
+        MediaItem mediaItem = mediaItemRepository.save(MediaItem.builder()
+                .name("someName")
+                .year(2000)
+                .category(Category.MOVIE)
+                .platforms(Set.of(platform))
+                .genres(Set.of(genre))
+                .build());
+
+        MediaItemRequest request = createMockMediaItemRequest();
+        request.setGenreIds(Set.of(genre.getId()));
+        // Act & Assert
+        mockMvc.perform(put("/admin/media-items/" + mediaItem.getId())
+                        .contentType(APPLICATION_JSON_VALUE)
+                        .content(objectMapper.writeValueAsString(request))
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void updateMediaItem_shouldReturn404_becauseGenreNotExist() throws Exception {
+        //Arrange
+        Genre genre = new Genre();
+        genre.setName("someGenre");
+        genre = genreRepository.save(genre);
+        Platform platform = new Platform();
+        platform.setName("somePlatform");
+        platform = platformRepository.save(platform);
+
+        MediaItem mediaItem = mediaItemRepository.save(MediaItem.builder()
+                        .name("someName")
+                        .year(2000)
+                        .category(Category.MOVIE)
+                        .platforms(Set.of(platform))
+                        .genres(Set.of(genre))
+                .build());
+
+        MediaItemRequest request = createMockMediaItemRequest();
+        request.setPlatformIds(Set.of(platform.getId()));
+        // Act & Assert
+        mockMvc.perform(put("/admin/media-items/" + mediaItem.getId())
+                        .contentType(APPLICATION_JSON_VALUE)
+                        .content(objectMapper.writeValueAsString(request))
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void updateMediaItem_shouldReturn404_becauseMediaItemNotExist() throws Exception {
+        //Arrange
+        MediaItemRequest request = createMockMediaItemRequest();
+        // Act & Assert
+        mockMvc.perform(put("/admin/media-items/1")
+                        .contentType(APPLICATION_JSON_VALUE)
+                        .content(objectMapper.writeValueAsString(request))
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void createMediaItem_shouldReturn404_becausePlatformNotExist() throws Exception {
+        //Arrange
+        Platform platform = new Platform();
+        platform.setName("somePlatform");
+        platform = platformRepository.save(platform);
+        MediaItemRequest request = createMockMediaItemRequest();
+        request.setPlatformIds(Set.of(platform.getId()));
+        // Act & Assert
+        mockMvc.perform(post("/admin/media-items")
+                        .contentType(APPLICATION_JSON_VALUE)
+                        .content(objectMapper.writeValueAsString(request))
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void createMediaItem_shouldReturn404_becauseGenreNotExist() throws Exception {
+        //Arrange
+        Genre genre = new Genre();
+        genre.setName("someGenre");
+        genre = genreRepository.save(genre);
+        MediaItemRequest request = createMockMediaItemRequest();
+        request.setGenreIds(Set.of(genre.getId()));
+        // Act & Assert
+        mockMvc.perform(post("/admin/media-items")
+                        .contentType(APPLICATION_JSON_VALUE)
+                        .content(objectMapper.writeValueAsString(request))
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void createMediaItem_shouldSucceedAndThenReturn409() throws Exception {
+        //Arrange
+        Genre genre = new Genre();
+        genre.setName("someGenre");
+        genre = genreRepository.save(genre);
+        Platform platform = new Platform();
+        platform.setName("somePlatform");
+        platform = platformRepository.save(platform);
+        MediaItemRequest request = createMockMediaItemRequest();
+        request.setGenreIds(Set.of(genre.getId()));
+        request.setPlatformIds(Set.of(platform.getId()));
+        // Act & Assert
+        mockMvc.perform(post("/admin/media-items")
+                        .contentType(APPLICATION_JSON_VALUE)
+                        .content(objectMapper.writeValueAsString(request))
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/admin/media-items")
+                        .contentType(APPLICATION_JSON_VALUE)
+                        .content(objectMapper.writeValueAsString(request))
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void createMediaItem_shouldReturn400_becausePlatformIdsEmpty() throws Exception {
+        MediaItemRequest request = createMockMediaItemRequest();
+        request.setPlatformIds(new HashSet<>());
+        // Act & Assert
+        mockMvc.perform(post("/admin/media-items")
+                        .contentType(APPLICATION_JSON_VALUE)
+                        .content(objectMapper.writeValueAsString(request))
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void createMediaItem_shouldReturn400_becauseGenreIdsEmpty() throws Exception {
+        MediaItemRequest request = createMockMediaItemRequest();
+        request.setGenreIds(new HashSet<>());
+        // Act & Assert
+        mockMvc.perform(post("/admin/media-items")
+                        .contentType(APPLICATION_JSON_VALUE)
+                        .content(objectMapper.writeValueAsString(request))
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void createMediaItem_shouldReturn400_becauseNameBlank() throws Exception {
+        MediaItemRequest request = createMockMediaItemRequest();
+        request.setName("  ");
+        // Act & Assert
+        mockMvc.perform(post("/admin/media-items")
+                        .contentType(APPLICATION_JSON_VALUE)
+                        .content(objectMapper.writeValueAsString(request))
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void createMediaItem_shouldReturn400_becauseCategoryNull() throws Exception {
+        MediaItemRequest request = createMockMediaItemRequest();
+        request.setCategory(null);
+        // Act & Assert
+        mockMvc.perform(post("/admin/media-items")
+                        .contentType(APPLICATION_JSON_VALUE)
+                        .content(objectMapper.writeValueAsString(request))
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
     void getAllPlatforms_shouldReturnEmptyResult() throws Exception {
         //Arrange
-        platformRepository.deleteAll();
         // Act & Assert
         mockMvc.perform(get("/admin/platforms")
                         .header("Authorization", "Bearer " + adminToken))
@@ -119,10 +381,36 @@ class AdminControllerIT {
     }
 
     @Test
-    void getAllPlatforms_shouldReturnAllResults() throws Exception {
+    void createPlatform_shouldReturnBadRequest_becauseEmptyName() throws Exception {
         //Arrange
-        savePlatforms(List.of("Netflix", "Disney+", "HBO Max", "PC", "Playstation 5"));
+        PlatformRequest request = new PlatformRequest();
+        request.setName("    ");
         // Act & Assert
+        mockMvc.perform(post("/admin/platforms")
+                        .contentType(APPLICATION_JSON_VALUE)
+                        .content(objectMapper.writeValueAsString(request))
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void createPlatformsAndGetAllPlatforms_shouldReturnAllResults() throws Exception {
+        //Create platforms
+        List<String> platformNames = List.of("Netflix", "Disney+", "HBO Max", "PC", "Playstation 5");
+        platformNames.forEach(pn -> {
+            PlatformRequest request = new PlatformRequest();
+            request.setName(pn);
+            try {
+                mockMvc.perform(post("/admin/platforms")
+                                .contentType(APPLICATION_JSON_VALUE)
+                                .content(objectMapper.writeValueAsString(request))
+                                .header("Authorization", "Bearer " + adminToken))
+                        .andExpect(status().isOk());
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+        //Get all platforms
         mockMvc.perform(get("/admin/platforms")
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
@@ -134,7 +422,6 @@ class AdminControllerIT {
     @Test
     void getAllGenres_shouldReturnEmptyResult() throws Exception {
         //Arrange
-        genreRepository.deleteAll();
         // Act & Assert
         mockMvc.perform(get("/admin/genres")
                         .header("Authorization", "Bearer " + adminToken))
@@ -143,10 +430,36 @@ class AdminControllerIT {
     }
 
     @Test
-    void getAllGenres_shouldReturnAllResults() throws Exception {
+    void createGenre_shouldReturnBadRequest_becauseEmptyName() throws Exception {
         //Arrange
-        saveGenres(List.of("Action", "Drama", "Documentary"));
+        GenreRequest request = new GenreRequest();
+        request.setName("    ");
         // Act & Assert
+        mockMvc.perform(post("/admin/genres")
+                        .contentType(APPLICATION_JSON_VALUE)
+                        .content(objectMapper.writeValueAsString(request))
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void createGenresAndGetAllGenres_shouldReturnAllResults() throws Exception {
+        //Create genres
+        List<String> genreNames = List.of("Action", "Drama", "Documentary");
+        genreNames.forEach(gn -> {
+            GenreRequest request = new GenreRequest();
+            request.setName(gn);
+            try {
+                mockMvc.perform(post("/admin/genres")
+                                .contentType(APPLICATION_JSON_VALUE)
+                                .content(objectMapper.writeValueAsString(request))
+                                .header("Authorization", "Bearer " + adminToken))
+                        .andExpect(status().isOk());
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+        //Get all platforms
         mockMvc.perform(get("/admin/genres")
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
@@ -398,23 +711,13 @@ class AdminControllerIT {
         assertThat(filePath).endsWith(".csv");
     }
 
-    private void saveGenres(List<String> genreNames) {
-        Set<Genre> genreList = new HashSet<>();
-        genreNames.forEach(genreName -> {
-            Genre genre = new Genre();
-            genre.setName(genreName);
-            genreList.add(genre);
-        });
-        genreRepository.saveAll(genreList);
-    }
-
-    private void savePlatforms(List<String> platformNames) {
-        Set<Platform> platformList = new HashSet<>();
-        platformNames.forEach(genreName -> {
-            Platform platform = new Platform();
-            platform.setName(genreName);
-            platformList.add(platform);
-        });
-        platformRepository.saveAll(platformList);
+    private MediaItemRequest createMockMediaItemRequest() {
+        MediaItemRequest request = new MediaItemRequest();
+        request.setCategory(Category.MOVIE);
+        request.setName("someName");
+        request.setYear(2000);
+        request.setGenreIds(Set.of(1L));
+        request.setPlatformIds(Set.of(1L));
+        return request;
     }
 }

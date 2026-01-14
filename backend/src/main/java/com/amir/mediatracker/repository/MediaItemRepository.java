@@ -19,13 +19,10 @@ import java.util.Set;
 @Repository
 public interface MediaItemRepository extends JpaRepository<MediaItem, Long> {
     List<MediaItem> findAllByNameIn(Collection<String> names);
+
     Optional<MediaItem> findByNameAndCategory(String name, Category category);
 
-    Page<MediaItem> findByNameContainingIgnoreCase(String name, Pageable pageable);
-
-    Page<MediaItem> findByNameContainingIgnoreCaseAndCategory(String name, Category category, Pageable pageable);
-
-    @Query("SELECT DISTINCT m FROM MediaItem m JOIN m.genres g WHERE LOWER(m.name) LIKE LOWER(CONCAT('%', :name, '%')) AND g.id IN :genreIds")
+    /*@Query("SELECT DISTINCT m FROM MediaItem m JOIN m.genres g WHERE LOWER(m.name) LIKE LOWER(CONCAT('%', :name, '%')) AND g.id IN :genreIds")
     List<MediaItem> searchByNameAndGenres(@Param("name") String name, @Param("genreIds") Set<Long> genreIds);
 
     @Query("SELECT DISTINCT m FROM MediaItem m JOIN m.platforms p WHERE LOWER(m.name) LIKE LOWER(CONCAT('%', :name, '%')) AND p.id IN :platformIds")
@@ -47,7 +44,7 @@ public interface MediaItemRepository extends JpaRepository<MediaItem, Long> {
             @Param("cursorName") String cursorName,
             @Param("cursorId") Long cursorId,
             Pageable pageable
-    );
+    );*/
 
     @Query("""
         SELECT DISTINCT m FROM MediaItem m
