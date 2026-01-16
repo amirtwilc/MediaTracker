@@ -31,6 +31,14 @@ public class UserQuery  {
     private final UserMediaListService userMediaListService;
     private final FollowService followService;
 
+    /**
+     * Search media items with cursor pagination. Cursor is (name, id)
+     * Category filtering is OR (for example: MOVIES or SERIES)
+     * Genre and Platform filtering is AND (for example: Action and Drama)
+     * @param input Defines search properties
+     * @param userPrincipal The user principal
+     * @return Cursor based media items search results, along with inUserList property for each item, signaling if the item is in the user's list
+     */
     @QueryMapping
     public MediaSearchResponse searchMediaItems(
             @Argument SearchMediaInput input,

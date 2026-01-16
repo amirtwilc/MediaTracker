@@ -3,5 +3,7 @@ jwt:
   expiration: 86400000  # 24 hours in milliseconds
 
 app:
+  search:
+    max-limit: 2 #changing this will affect the test
   notification:
     fetch-limit: 2 #changing this will affect the test

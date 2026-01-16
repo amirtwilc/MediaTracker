@@ -83,9 +83,12 @@ logging:
     org.hibernate.SQL: INFO
 
 app:
+  search:
+    max-limit: 100
   batch:
     chunk-size: 10
     skip-limit: 100
   notification:
     fetch-limit: 50
+
 

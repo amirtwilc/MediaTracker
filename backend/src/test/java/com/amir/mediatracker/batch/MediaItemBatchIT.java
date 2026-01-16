@@ -1,25 +1,15 @@
 package com.amir.mediatracker.batch;
 
+import com.amir.mediatracker.config.AbstractIntegrationTest;
 import com.amir.mediatracker.dto.Category;
 import com.amir.mediatracker.entity.Genre;
 import com.amir.mediatracker.entity.MediaItem;
 import com.amir.mediatracker.entity.Platform;
-import com.amir.mediatracker.repository.GenreRepository;
-import com.amir.mediatracker.repository.MediaItemRepository;
-import com.amir.mediatracker.repository.PlatformRepository;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.batch.core.*;
 import org.springframework.batch.core.launch.JobLauncher;
 import org.springframework.batch.test.JobLauncherTestUtils;
-import org.springframework.batch.test.context.SpringBatchTest;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.test.context.TestPropertySource;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -31,17 +21,7 @@ import java.util.function.Function;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.batch.core.BatchStatus.COMPLETED;
 
-@SpringBootTest
-@SpringBatchTest
-@Testcontainers
-@TestPropertySource(properties = {
-        "spring.batch.job.enabled=false" // Disable auto-run
-})
-class MediaItemBatchIT {
-
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
+class MediaItemBatchIT extends AbstractIntegrationTest {
 
     @Autowired
     private JobLauncherTestUtils jobLauncherTestUtils;
@@ -51,23 +31,6 @@ class MediaItemBatchIT {
 
     @Autowired
     private Job mediaItemImportJob;
-
-    @Autowired
-    private MediaItemRepository mediaItemRepository;
-
-    @Autowired
-    private GenreRepository genreRepository;
-
-    @Autowired
-    private PlatformRepository platformRepository;
-
-    @AfterEach
-    void cleanup() {
-        // Clean up database after each test
-        mediaItemRepository.deleteAll();
-        genreRepository.deleteAll();
-        platformRepository.deleteAll();
-    }
 
     @Test
     void importJob_WithValidCsv_ShouldInsertItemsToDatabase() throws Exception {

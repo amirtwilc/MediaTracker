@@ -1,5 +1,6 @@
 package com.amir.mediatracker.controller;
 
+import com.amir.mediatracker.config.AbstractIntegrationTest;
 import com.amir.mediatracker.dto.Category;
 import com.amir.mediatracker.dto.request.GenreRequest;
 import com.amir.mediatracker.dto.request.MediaItemRequest;
@@ -7,14 +8,9 @@ import com.amir.mediatracker.dto.request.PlatformRequest;
 import com.amir.mediatracker.entity.Genre;
 import com.amir.mediatracker.entity.MediaItem;
 import com.amir.mediatracker.entity.Platform;
-import com.amir.mediatracker.repository.GenreRepository;
-import com.amir.mediatracker.repository.MediaItemRepository;
-import com.amir.mediatracker.repository.PlatformRepository;
-import com.amir.mediatracker.security.JwtTokenProvider;
 import com.amir.mediatracker.service.AsyncBatchService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jayway.jsonpath.JsonPath;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
@@ -23,29 +19,17 @@ import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.JobParameters;
 import org.springframework.batch.core.explore.JobExplorer;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.userdetails.User;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.nio.file.Path;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -56,32 +40,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
-@Testcontainers
-@AutoConfigureMockMvc
-class AdminControllerIT {
-
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
-
-    @Autowired
-    private MockMvc mockMvc;
-
-    @Autowired
-    private JwtTokenProvider jwtTokenProvider;
+class AdminControllerIT extends AbstractIntegrationTest {
 
     @Autowired
     private ObjectMapper objectMapper;
-
-    @Autowired
-    private GenreRepository genreRepository;
-
-    @Autowired
-    private PlatformRepository platformRepository;
-
-    @Autowired
-    private MediaItemRepository mediaItemRepository;
 
     @MockitoBean
     private AsyncBatchService asyncBatchService;
@@ -91,47 +53,6 @@ class AdminControllerIT {
 
     @TempDir
     Path tempDir;
-
-    private String adminToken;
-    private String userToken;
-
-    @BeforeEach
-    void setUp() {
-        // Create admin UserDetails
-        User adminUser =
-                new User(
-                        "admin",
-                        "password",
-                        Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN"))
-                );
-
-        Authentication adminAuth = new UsernamePasswordAuthenticationToken(
-                adminUser,
-                null,
-                adminUser.getAuthorities()
-        );
-        adminToken = jwtTokenProvider.generateToken(adminAuth);
-
-        // Create user UserDetails
-        org.springframework.security.core.userdetails.User regularUser =
-                new org.springframework.security.core.userdetails.User(
-                        "user",
-                        "password",
-                        Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"))
-                );
-
-        Authentication userAuth = new UsernamePasswordAuthenticationToken(
-                regularUser,
-                null,
-                regularUser.getAuthorities()
-        );
-        userToken = jwtTokenProvider.generateToken(userAuth);
-
-        //clear DB
-        genreRepository.deleteAll();
-        platformRepository.deleteAll();
-        mediaItemRepository.deleteAll();
-    }
 
     @Test
     void createUpdateAndDeleteMediaItem_shouldSucceed() throws Exception {
@@ -463,7 +384,7 @@ class AdminControllerIT {
         mockMvc.perform(get("/admin/genres")
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
-                .andExpect(MockMvcResultMatchers.jsonPath("$.length()").value(3))
+                .andExpect(jsonPath("$.length()").value(3))
                 .andExpect(jsonPath("$[*].id").isNotEmpty())
                 .andExpect(jsonPath("$[*].name").isNotEmpty());
     }

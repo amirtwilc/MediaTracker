@@ -10,9 +10,9 @@ import com.amir.mediatracker.entity.MediaItem;
 import com.amir.mediatracker.entity.Platform;
 import com.amir.mediatracker.repository.MediaItemRepository;
 import com.amir.mediatracker.repository.UserMediaListRepository;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.kafka.common.errors.ResourceNotFoundException;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -23,16 +23,31 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-@Service
 @Slf4j
+@Service
+@RequiredArgsConstructor
 public class MediaItemService {
 
-    @Autowired
-    private MediaItemRepository mediaItemRepository;
+    @Value("${app.search.max-limit}")
+    private int maxLimit;
 
-    @Autowired
-    private UserMediaListRepository userMediaListRepository;
+    private final MediaItemRepository mediaItemRepository;
+    private final UserMediaListRepository userMediaListRepository;
 
+    /**
+     * Search media items with cursor pagination.
+     * Supports filtering by name, category, genre, and platform.
+     * For each media item, it also checks if the user has added it to their list.
+     * @param userId The id of the user
+     * @param query name search criteria. For example: "The Matri" might return the movie The Matrix
+     * @param categories Optional filter for categories. For example: Return only MOVIES and SERIES
+     * @param genreIds Optional filter for genres. For example: Return only items that contain exactly these genres: Action and Drama
+     * @param platformIds Optional filter for platforms. For example: Return only items that contain exactly these platforms: Netflix and HBO Max
+     * @param cursorName Name of the item used for cursoring. Providing this name results in providing a page that starts with next item
+     * @param cursorId Id of the item used for cursoring. Providing this name results in providing a page that starts with next item
+     * @param limit Number of items to return
+     * @return MediaSearchResponse
+     */
     public MediaSearchResponse searchMediaItemsCursor(
             Long userId,
             String query,
@@ -43,37 +58,36 @@ public class MediaItemService {
             Long cursorId,
             int limit
     ) {
-        Pageable pageable = PageRequest.of(0, limit + 1);
+        limit = Math.min(Math.max(limit, 1), maxLimit); //avoid negative and overflow
+        Pageable pageable = PageRequest.of(0, limit + 1); // +1 to know if there are more items
 
-        Set<Long> safeGenres = genreIds == null ? Set.of() : genreIds;
-        Set<Long> safePlatforms = platformIds == null ? Set.of() : platformIds;
+        // Safe inputs
+        Set<Long> safeGenres = (genreIds == null  || genreIds.isEmpty()) ? null : genreIds;
+        Set<Long> safePlatforms = (platformIds == null  || platformIds.isEmpty()) ? null : platformIds;
         Set<Category> safeCategories = (categories == null || categories.isEmpty()) ? null : categories;
 
         // Get the count first
         long totalCount;
-        if (safeGenres.isEmpty() && safePlatforms.isEmpty()) {
+        if (safeGenres == null && safePlatforms == null) {
             totalCount = mediaItemRepository.countSimple(query, safeCategories);
         } else {
-            try {
-                totalCount = mediaItemRepository.countWithFiltersSimple(
-                        query,
-                        safeCategories,
-                        safeGenres.isEmpty() ? null : safeGenres,
-                        safePlatforms.isEmpty() ? null : safePlatforms
-                );
-            } catch (Exception e) {
-                log.error("Failed to count with filters, falling back to simple count", e);
-                totalCount = mediaItemRepository.countSimple(query, safeCategories);
-            }
+            totalCount = mediaItemRepository.countWithFilters(
+                    query,
+                    safeCategories,
+                    safeGenres,
+                    safePlatforms,
+                    safeGenres == null ? 0 : safeGenres.size(),
+                    safePlatforms == null ? 0 : safePlatforms.size()
+            );
         }
 
         List<MediaItem> items = mediaItemRepository.searchWithCursorAndFilters(
                 query,
                 safeCategories,
-                safeGenres.isEmpty() ? null : safeGenres,
-                safePlatforms.isEmpty() ? null : safePlatforms,
-                safeGenres.size(),
-                safePlatforms.size(),
+                safeGenres,
+                safePlatforms,
+                safeGenres == null ? 0 : safeGenres.size(),
+                safePlatforms == null ? 0 : safePlatforms.size(),
                 cursorName,
                 cursorId,
                 pageable
@@ -86,7 +100,7 @@ public class MediaItemService {
 
         // Check which items are in user's list
         if (userId != null && !items.isEmpty()) {
-            List<Long> itemIds = items.stream().map(MediaItem::getId).collect(Collectors.toList());
+            List<Long> itemIds = items.stream().map(MediaItem::getId).toList();
             Set<Long> userItemIds = userMediaListRepository
                     .findByUserIdAndMediaItemIdIn(userId, itemIds)
                     .stream()
@@ -102,8 +116,8 @@ public class MediaItemService {
 
         MediaSearchResponse.Cursor nextCursor = null;
         if (hasMore) {
-            MediaItem last = items.get(items.size() - 1);
-            nextCursor = new MediaSearchResponse.Cursor(last.getName(), last.getId());
+            MediaItem lastItem = items.getLast();
+            nextCursor = new MediaSearchResponse.Cursor(lastItem.getName(), lastItem.getId());
         }
 
         return MediaSearchResponse.builder()
@@ -181,7 +195,7 @@ public class MediaItemService {
         return itemsPage.map(this::mapToResponse);
     }
 
-    public List<MediaItemResponse> searchMediaItems(String query, Category category, int page, int size) {
+    /*public List<MediaItemResponse> searchMediaItems(String query, Category category, int page, int size) {
         Page<MediaItem> items;
 
         Pageable pageable = PageRequest.of(page, size, Sort.by("name").ascending());
@@ -200,13 +214,13 @@ public class MediaItemService {
         return items.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
-    }
+    }*/
 
-    public MediaItemResponse getMediaItem(Long id) {
+    /*public MediaItemResponse getMediaItem(Long id) {
         MediaItem item = mediaItemRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Media item not found"));
         return mapToResponse(item);
-    }
+    }*/
 
     private MediaItemResponse mapToResponse(MediaItem item) {
         return MediaItemResponse.builder()
