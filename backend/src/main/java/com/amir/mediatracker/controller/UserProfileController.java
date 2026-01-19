@@ -88,47 +88,46 @@ public class UserProfileController {
         return userSearchService.advancedSearch(userPrincipal.getId(), request);
     }
 
+    /**
+     * Returns a user profile statistics.
+     * Any authenticated user may view a public profile.
+     * @param userId The id of the user for whom to return the profile
+     * @param userPrincipal The user principal
+     * @return UserProfileResponse
+     */
     @GetMapping("/{userId}/profile")
-    public ResponseEntity<UserProfileResponse> getUserProfile(
+    public UserProfileResponse getUserProfile(
             @PathVariable Long userId,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
 
-        UserProfileResponse profile = userSearchService.getUserProfile(
+        return userSearchService.getUserProfile(
                 userId, userPrincipal.getId());
-        return ResponseEntity.ok(profile);
     }
 
-    @GetMapping("/{userId}/list")
-    public ResponseEntity<List<UserMediaListResponse>> getUserMediaList(
-            @PathVariable Long userId,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "100") int size,
+    /**
+     * Returns a user current settings
+     * @param userPrincipal The user principal
+     * @return UserSettingsResponse
+     */
+    @GetMapping("/me/settings")
+    public UserSettingsResponse getSettings(
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
 
-        // Check if user is visible
-        UserProfileResponse profile = userSearchService.getUserProfile(
-                userId, userPrincipal.getId());
-
-        List<UserMediaListResponse> list = userMediaListService.getUserMediaList(
-                userId, page, size);
-        return ResponseEntity.ok(list);
+        return userSettingsService.getSettings(userPrincipal.getId());
     }
 
-    @GetMapping("/settings")
-    public ResponseEntity<UserSettingsResponse> getSettings(
-            @AuthenticationPrincipal UserPrincipal userPrincipal) {
-
-        UserSettingsResponse settings = userSettingsService.getSettings(userPrincipal.getId());
-        return ResponseEntity.ok(settings);
-    }
-
-    @PutMapping("/settings")
-    public ResponseEntity<UserSettingsResponse> updateSettings(
+    /**
+     * Update a user settings
+     * @param request UserSettingsRequest
+     * @param userPrincipal The user principal
+     * @return UserSettingsResponse
+     */
+    @PutMapping("/me/settings")
+    public UserSettingsResponse updateSettings(
             @RequestBody @Valid UserSettingsRequest request,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
 
-        UserSettingsResponse updated = userSettingsService.updateSettings(
+        return userSettingsService.updateSettings(
                 userPrincipal.getId(), request);
-        return ResponseEntity.ok(updated);
     }
 }

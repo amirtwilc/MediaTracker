@@ -5,6 +5,7 @@ import com.amir.mediatracker.dto.request.UpdateMediaListRequest;
 import com.amir.mediatracker.dto.response.*;
 import com.amir.mediatracker.entity.*;
 import com.amir.mediatracker.exception.DuplicateResourceException;
+import com.amir.mediatracker.exception.ForbiddenException;
 import com.amir.mediatracker.exception.ResourceNotFoundException;
 import com.amir.mediatracker.repository.MediaItemRepository;
 import com.amir.mediatracker.repository.UserMediaListRepository;
@@ -45,16 +46,9 @@ public class UserMediaListService {
         }
     }
 
-    public List<UserMediaListResponse> getUserMediaList(Long userId, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("mediaItem.name").ascending());
-        Page<UserMediaList> list = userMediaListRepository.findByUserId(userId, pageable);
-        return list.stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
-    }
-
     public UserMediaListSearchResponse getUserMediaListCursor(
-            Long userId,
+            Long displayUserId,
+            Long requestorUserId,
             String searchQuery,
             Set<Category> categories,
             Set<Long> genreIds,
@@ -64,6 +58,7 @@ public class UserMediaListService {
             Long cursorId,
             int limit
     ) {
+        displayUserId = decideWhichUserToShow(displayUserId, requestorUserId);
         Pageable pageable = PageRequest.of(0, limit + 1);
 
         Set<Long> safeGenres = genreIds == null ? Set.of() : genreIds;
@@ -75,24 +70,18 @@ public class UserMediaListService {
         Long safeCursorId = cursorId == null ? 0L : cursorId;
 
         // Get total count with filters
-        long totalCount;
-        try {
-            totalCount = userMediaListRepository.countByUserIdWithFiltersSimple(
-                    userId,
-                    safeSearchQuery,
-                    safeCategories,
-                    safeGenres.isEmpty() ? null : safeGenres,
-                    safePlatforms.isEmpty() ? null : safePlatforms,
-                    safeWishToExperience
-            );
-        } catch (Exception e) {
-            log.error("Failed to count with filters", e);
-            totalCount = userMediaListRepository.countByUserId(userId);
-        }
+        long totalCount = userMediaListRepository.countByUserIdWithFiltersSimple(
+                displayUserId,
+                safeSearchQuery,
+                safeCategories,
+                safeGenres.isEmpty() ? null : safeGenres,
+                safePlatforms.isEmpty() ? null : safePlatforms,
+                safeWishToExperience
+        );
 
         // Fetch items with cursor and filters (sorted by name by default)
         List<UserMediaList> items = userMediaListRepository.findByUserIdWithFilters(
-                userId,
+                displayUserId,
                 safeSearchQuery,
                 safeCategories,
                 safeGenres.isEmpty() ? null : safeGenres,
@@ -132,7 +121,8 @@ public class UserMediaListService {
     }
 
     public Page<UserMediaListResponse> getUserMediaListSorted(
-            Long userId,
+            Long displayUserId,
+            Long requestorUserId,
             String searchQuery,
             Set<Category> categories,
             Set<Long> genreIds,
@@ -143,6 +133,7 @@ public class UserMediaListService {
             String sortBy,
             String sortDirection
     ) {
+        displayUserId = decideWhichUserToShow(displayUserId, requestorUserId);
         Set<Long> safeGenres = genreIds == null ? Set.of() : genreIds;
         Set<Long> safePlatforms = platformIds == null ? Set.of() : platformIds;
         Set<Category> safeCategories = (categories == null || categories.isEmpty()) ? null : categories;
@@ -157,7 +148,7 @@ public class UserMediaListService {
 
         // Fetch page with sorting
         Page<UserMediaList> itemsPage = userMediaListRepository.findByUserIdWithFiltersSorted(
-                userId,
+                displayUserId,
                 safeSearchQuery,
                 safeCategories,
                 safeGenres.isEmpty() ? null : safeGenres,
@@ -328,5 +319,19 @@ public class UserMediaListService {
         return platforms.stream()
                 .map(p -> PlatformResponse.builder().id(p.getId()).name(p.getName()).build())
                 .collect(Collectors.toList());
+    }
+
+    private Long decideWhichUserToShow(Long displayUserId, Long requestorUserId) {
+        if (displayUserId == null) {
+            displayUserId = requestorUserId;
+        } else if (!displayUserId.equals(requestorUserId)) {
+            User displayUser = userRepository.findById(displayUserId)
+                    .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+            if (displayUser.getIsInvisible()) {
+                throw new ForbiddenException("User list is private");
+            }
+        }
+
+        return displayUserId;
     }
 }

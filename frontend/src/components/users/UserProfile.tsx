@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ArrowLeft, UserPlus, Check, Filter, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Search, X } from 'lucide-react';
-import { UserProfile as UserProfileType, UserMediaListItem, Genre, Platform } from '../../types';
+import { UserProfile as UserProfileType, UserMediaListItem } from '../../types';
 import { api } from '../../services/api';
 import { StarRating } from '../common/StarRating';
 import { useAuth } from '../../contexts/AuthContext';
@@ -25,7 +25,7 @@ interface PageCache {
 }
 
 export const UserProfile: React.FC<UserProfileProps> = ({ userId, onBack }) => {
-  const { user: currentUser, isAdmin } = useAuth();
+  const { user: currentUser } = useAuth();
   const [profile, setProfile] = useState<UserProfileType | null>(null);
   const [items, setItems] = useState<UserMediaListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,12 +44,6 @@ export const UserProfile: React.FC<UserProfileProps> = ({ userId, onBack }) => {
   // Filters
   const [showFilters, setShowFilters] = useState(false);
   const [filterCategories, setFilterCategories] = useState<string[]>([]);
-  const [filterGenres, setFilterGenres] = useState<string[]>([]);
-  const [filterPlatforms, setFilterPlatforms] = useState<string[]>([]);
-
-  // Available filter options
-  const [availableGenres, setAvailableGenres] = useState<Genre[]>([]);
-  const [availablePlatforms, setAvailablePlatforms] = useState<Platform[]>([]);
 
   const [followModal, setFollowModal] = useState<{ show: boolean }>({ show: false });
   const [unfollowConfirm, setUnfollowConfirm] = useState(false);
@@ -59,7 +53,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ userId, onBack }) => {
   // Pagination mode
   const [paginationMode, setPaginationMode] = useState<'cursor' | 'offset'>('cursor');
 
-  // Sorting (client-side only for cursor, server-side for offset)
+  // Sorting
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
   // Cursor-based pagination state
@@ -80,43 +74,12 @@ export const UserProfile: React.FC<UserProfileProps> = ({ userId, onBack }) => {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Memoize loadAvailableFilters to prevent recreation on every render
-  const loadAvailableFilters = useCallback(async () => {
-    try {
-      const userList = await api.getUserMediaList(userId, 0, 1000);
-
-      const genresSet = new Set<string>();
-      const platformsSet = new Set<string>();
-
-      userList.forEach((item: UserMediaListItem) => {
-        item.mediaItem.genres.forEach((g: Genre) => genresSet.add(g.name));
-        item.mediaItem.platforms.forEach((p: Platform) => platformsSet.add(p.name));
-      });
-
-      const genresArray = Array.from(genresSet).sort().map((name, index) => ({
-        id: index,
-        name
-      }));
-
-      const platformsArray = Array.from(platformsSet).sort().map((name, index) => ({
-        id: index,
-        name
-      }));
-
-      setAvailableGenres(genresArray);
-      setAvailablePlatforms(platformsArray);
-    } catch (error) {
-      console.error('Failed to load available filters', error);
-    }
-  }, [userId]);
-
   // Initial load only
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
       loadProfile();
       loadPage(0);
-      loadAvailableFilters();
     }
   }, []);
 
@@ -125,7 +88,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ userId, onBack }) => {
     if (!isInitialMount.current) {
       handleSearch();
     }
-  }, [debouncedSearchQuery, filterCategories, filterGenres, filterPlatforms]);
+  }, [debouncedSearchQuery, filterCategories]);
 
   // Reload when sort changes
   useEffect(() => {
@@ -150,8 +113,6 @@ export const UserProfile: React.FC<UserProfileProps> = ({ userId, onBack }) => {
     const filters = {
       searchQuery: debouncedSearchQuery,
       categories: filterCategories.sort(),
-      genres: filterGenres.sort(),
-      platforms: filterPlatforms.sort(),
       sort: sortConfig,
     };
     return `${page}-${JSON.stringify(filters)}`;
@@ -162,80 +123,44 @@ export const UserProfile: React.FC<UserProfileProps> = ({ userId, onBack }) => {
     cursor: { name: string; id: number } | null,
     signal?: AbortSignal
   ): Promise<CachedPage> => {
-    // For simplicity with user lists, we'll fetch all and filter/sort client-side
-    // This is because we don't have a specialized endpoint for other users' lists with filters
-    const allUserItems = await api.getUserMediaList(userId, 0, 1000);
+    const categories = filterCategories.length > 0 ? filterCategories : undefined;
 
-    // Apply filters
-    let filtered = allUserItems.filter((item: UserMediaListItem) => {
-      if (debouncedSearchQuery.trim()) {
-        const query = debouncedSearchQuery.toLowerCase().trim();
-        if (!item.mediaItem.name.toLowerCase().includes(query)) {
-          return false;
-        }
-      }
-
-      if (filterCategories.length > 0 && !filterCategories.includes(item.mediaItem.category)) {
-        return false;
-      }
-
-      if (filterGenres.length > 0) {
-        const hasMatchingGenre = item.mediaItem.genres.some(g => filterGenres.includes(g.name));
-        if (!hasMatchingGenre) return false;
-      }
-
-      if (filterPlatforms.length > 0) {
-        const hasMatchingPlatform = item.mediaItem.platforms.some(p => filterPlatforms.includes(p.name));
-        if (!hasMatchingPlatform) return false;
-      }
-
-      return true;
-    });
-
-    // Apply sorting if configured
-    if (sortConfig) {
-      filtered = filtered.sort((a: UserMediaListItem, b: UserMediaListItem) => {
-        let comparison = 0;
-
-        switch (sortConfig.key) {
-          case 'name':
-            comparison = a.mediaItem.name.localeCompare(b.mediaItem.name);
-            break;
-          case 'year':
-            comparison = (a.mediaItem.year || 0) - (b.mediaItem.year || 0);
-            break;
-          case 'experienced':
-            comparison = (a.experienced ? 1 : 0) - (b.experienced ? 1 : 0);
-            break;
-          case 'reexperience':
-            comparison = (a.wishToReexperience ? 1 : 0) - (b.wishToReexperience ? 1 : 0);
-            break;
-          case 'rating':
-            comparison = (a.rating || 0) - (b.rating || 0);
-            break;
-        }
-
-        return sortConfig.direction === 'asc' ? comparison : -comparison;
+    if (paginationMode === 'offset' && sortConfig) {
+      // Use GraphQL sorted endpoint with offset pagination
+      const response = await api.getUserMediaListSortedGraphQL({
+        displayUserId: userId,
+        searchQuery: debouncedSearchQuery || undefined,
+        categories,
+        page: pageNum,
+        size: 20,
+        sortBy: sortConfig.key,
+        sortDirection: sortConfig.direction.toUpperCase(),
       });
+
+      return {
+        items: response.content,
+        cursor: null,
+        hasMore: pageNum < response.totalPages - 1,
+        totalCount: response.totalElements,
+      };
     } else {
-      // Default sort by name
-      filtered = filtered.sort((a: UserMediaListItem, b: UserMediaListItem) =>
-        a.mediaItem.name.localeCompare(b.mediaItem.name)
-      );
+      // Use GraphQL cursor endpoint (unsorted, default by name)
+      const response = await api.getUserMediaListCursorGraphQL({
+        displayUserId: userId,
+        searchQuery: debouncedSearchQuery || undefined,
+        categories,
+        cursorName: cursor?.name,
+        cursorId: cursor?.id,
+        limit: 20,
+      });
+
+      return {
+        items: response.items,
+        cursor: response.nextCursor || null,
+        hasMore: response.hasMore,
+        totalCount: response.totalCount,
+      };
     }
-
-    const totalCount = filtered.length;
-    const totalPages = Math.ceil(totalCount / 20);
-    const startIdx = pageNum * 20;
-    const endIdx = Math.min(startIdx + 20, totalCount);
-    const pageItems = filtered.slice(startIdx, endIdx);
-
-    return {
-      items: pageItems,
-      cursor: null,
-      hasMore: pageNum < totalPages - 1,
-      totalCount,
-    };
   };
 
   const prefetchPage = async (pageNum: number) => {
@@ -245,15 +170,30 @@ export const UserProfile: React.FC<UserProfileProps> = ({ userId, onBack }) => {
       return;
     }
 
+    if (pageNum >= cursors.length) {
+      return;
+    }
+
     setPrefetchInProgress(prev => new Set(prev).add(pageNum));
 
     try {
-      const result = await fetchPage(pageNum, null);
+      const cursor = cursors[pageNum];
+      const result = await fetchPage(pageNum, cursor);
 
       setPageCache(prev => ({
         ...prev,
         [cacheKey]: result,
       }));
+
+      if (result.hasMore && result.cursor) {
+        setCursors(prev => {
+          const newCursors = [...prev];
+          if (pageNum + 1 >= newCursors.length) {
+            newCursors.push(result.cursor);
+          }
+          return newCursors;
+        });
+      }
     } catch (error) {
       console.error(`Failed to prefetch page ${pageNum}`, error);
     } finally {
@@ -287,12 +227,23 @@ export const UserProfile: React.FC<UserProfileProps> = ({ userId, onBack }) => {
     setLoading(true);
 
     try {
-      const result = await fetchPage(pageNum, null, abortControllerRef.current.signal);
+      const cursor = cursors[pageNum];
+      const result = await fetchPage(pageNum, cursor, abortControllerRef.current.signal);
 
       setPageCache(prev => ({
         ...prev,
         [cacheKey]: result,
       }));
+
+      if (result.hasMore && result.cursor) {
+        setCursors(prev => {
+          const newCursors = [...prev];
+          if (pageNum + 1 >= newCursors.length) {
+            newCursors.push(result.cursor);
+          }
+          return newCursors;
+        });
+      }
 
       setItems(result.items);
       setHasNextPage(result.hasMore);
@@ -315,7 +266,9 @@ export const UserProfile: React.FC<UserProfileProps> = ({ userId, onBack }) => {
 
   const handleSearch = () => {
     setCurrentPage(0);
-    setCursors([null]);
+    if (paginationMode === 'cursor') {
+      setCursors([null]);
+    }
     setPageCache({});
     loadPage(0);
   };
@@ -407,10 +360,15 @@ export const UserProfile: React.FC<UserProfileProps> = ({ userId, onBack }) => {
   const handleSort = (key: string) => {
     setSortConfig(current => {
       if (!current || current.key !== key) {
+        // First click: sort ascending, switch to offset pagination
+        setPaginationMode('offset');
         return { key, direction: 'asc' };
       } else if (current.direction === 'asc') {
+        // Second click: sort descending, stay in offset pagination
         return { key, direction: 'desc' };
       } else {
+        // Third click: remove sort, switch back to cursor pagination
+        setPaginationMode('cursor');
         return null;
       }
     });
@@ -434,13 +392,8 @@ export const UserProfile: React.FC<UserProfileProps> = ({ userId, onBack }) => {
     }
   };
 
-  const hasActiveFilters = filterCategories.length > 0 || filterGenres.length > 0 ||
-    filterPlatforms.length > 0;
+  const hasActiveFilters = filterCategories.length > 0;
   const hasActiveSearch = searchQuery.trim().length > 0;
-
-  const showComment = (item: UserMediaListItem) => {
-    return currentUser?.id === userId || profile?.role === 'ADMIN';
-  };
 
   if (error) {
     return (
@@ -677,53 +630,11 @@ export const UserProfile: React.FC<UserProfileProps> = ({ userId, onBack }) => {
             </div>
           </div>
 
-          {availableGenres.length > 0 && (
-            <div>
-              <label className="block text-sm text-gray-300 mb-2">Genres:</label>
-              <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
-                {availableGenres.map(genre => (
-                  <button
-                    key={genre.id}
-                    onClick={() => toggleFilter(filterGenres, setFilterGenres, genre.name)}
-                    className={`px-3 py-1 rounded text-sm ${filterGenres.includes(genre.name)
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                      }`}
-                  >
-                    {genre.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {availablePlatforms.length > 0 && (
-            <div>
-              <label className="block text-sm text-gray-300 mb-2">Platforms:</label>
-              <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
-                {availablePlatforms.map(platform => (
-                  <button
-                    key={platform.id}
-                    onClick={() => toggleFilter(filterPlatforms, setFilterPlatforms, platform.name)}
-                    className={`px-3 py-1 rounded text-sm ${filterPlatforms.includes(platform.name)
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                      }`}
-                  >
-                    {platform.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
           {(hasActiveFilters || hasActiveSearch) && (
             <button
               onClick={() => {
                 setSearchQuery('');
                 setFilterCategories([]);
-                setFilterGenres([]);
-                setFilterPlatforms([]);
               }}
               className="text-sm text-blue-400 hover:text-blue-300"
             >
@@ -787,16 +698,14 @@ export const UserProfile: React.FC<UserProfileProps> = ({ userId, onBack }) => {
                     className="px-4 py-3 text-center cursor-pointer hover:bg-gray-600"
                     onClick={() => handleSort('reexperience')}
                   >
-                    Re-experience {getSortIcon('reexperience')}
-                  </th>
+                    Re-experience {getSortIcon('reexperience')}</th>
                   <th
                     className="px-4 py-3 text-left cursor-pointer hover:bg-gray-600"
                     onClick={() => handleSort('rating')}
                   >
-                    Rating {getSortIcon('rating')}</th>
-                  {showComment(items[0]) && (
-                    <th className="px-4 py-3 text-left">Comment</th>
-                  )}
+                    Rating {getSortIcon('rating')}
+                  </th>
+                  <th className="px-4 py-3 text-left">Comment</th>
                 </tr>
               </thead>
               <tbody className="text-sm">
@@ -824,9 +733,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ userId, onBack }) => {
                     <td className="px-4 py-3">
                       <StarRating rating={item.rating} readonly />
                     </td>
-                    {showComment(item) && (
-                      <td className="px-4 py-3 text-sm text-gray-300">{item.comment || '-'}</td>
-                    )}
+                    <td className="px-4 py-3 text-sm text-gray-300">{item.comment || '-'}</td>
                   </tr>
                 ))}
               </tbody>

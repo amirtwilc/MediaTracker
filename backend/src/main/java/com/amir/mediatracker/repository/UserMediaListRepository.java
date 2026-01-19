@@ -17,7 +17,6 @@ import java.util.Set;
 
 @Repository
 public interface UserMediaListRepository extends JpaRepository<UserMediaList, Long> {
-    Page<UserMediaList> findByUserId(Long userId, Pageable pageable);
 
     Optional<UserMediaList> findByIdAndUserId(Long id, Long userId);
 
@@ -25,10 +24,13 @@ public interface UserMediaListRepository extends JpaRepository<UserMediaList, Lo
 
     List<UserMediaList> findAllByMediaItemIdAndRatingIsNotNull(Long mediaItemId);
 
-    long countByUserIdAndRatingIsNotNull(Long userId);
-
-    List<UserMediaList> findByUserIdAndMediaItemIdInAndRatingIsNotNull(
-            Long userId, List<Long> mediaItemIds);
+    @Query("""
+            SELECT uml FROM UserMediaList uml
+            JOIN uml.mediaItem mi
+            WHERE uml.user.id = :userId
+            ORDER BY mi.name ASC
+            """)
+    Page<UserMediaList> findByUserIdSortedByMediaItemName(@Param("userId") Long userId, Pageable pageable);
 
     @Query("""
             SELECT uml FROM UserMediaList uml
@@ -115,9 +117,6 @@ public interface UserMediaListRepository extends JpaRepository<UserMediaList, Lo
             @Param("platformIds") Set<Long> platformIds,
             @Param("wishToExperience") boolean wishToExperience
     );
-
-    @Query("SELECT COUNT(uml) FROM UserMediaList uml WHERE uml.user.id = :userId")
-    Long countByUserId(@Param("userId") Long userId);
 
     @Query("""
             SELECT DISTINCT g FROM UserMediaList uml

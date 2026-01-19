@@ -1,8 +1,8 @@
 type Query {
   searchMediaItems(input: SearchMediaInput!): MediaSearchResult!
   searchMediaItemsSorted(input: SearchMediaSortedInput!): MediaPageResult!
-  myMediaListCursor(input: MyMediaListInput!): UserMediaListSearchResult!
-  myMediaListSorted(input: MyMediaListSortedInput!): UserMediaListPageResult!
+  userMediaListCursor(input: UserMediaListInput!): UserMediaListSearchResult!
+  userMediaListSorted(input: UserMediaListSortedInput!): UserMediaListPageResult!
   myListGenres(input: MyListFiltersInput!): [GenreResponse!]!
   myListPlatforms(input: MyListFiltersInput!): [PlatformResponse!]!
   availableMediaGenres(input: AvailableFiltersInput!): [GenreResponse!]!
@@ -135,7 +135,8 @@ type MediaPageResult {
   size: Int!
 }
 
-input MyMediaListInput {
+input UserMediaListInput {
+  displayUserId: ID
   searchQuery: String
   categories: [Category!]
   genreIds: [ID!]
@@ -153,7 +154,8 @@ type UserMediaListSearchResult {
   totalCount: Int!
 }
 
-input MyMediaListSortedInput {
+input UserMediaListSortedInput {
+  displayUserId: ID
   searchQuery: String
   categories: [Category!]
   genreIds: [ID!]

@@ -156,7 +156,7 @@ export const MyMediaList: React.FC = () => {
 
     if (paginationMode === 'offset' && sortConfig) {
       // Use GraphQL sorted endpoint with offset pagination
-      const response = await api.getMyMediaListSortedGraphQL({
+      const response = await api.getUserMediaListSortedGraphQL({
         searchQuery: debouncedSearchQuery || undefined,
         categories,
         genreIds,
@@ -176,7 +176,7 @@ export const MyMediaList: React.FC = () => {
       };
     } else {
       // Use GraphQL cursor endpoint (unsorted, default by name)
-      const response = await api.getMyMediaListCursorGraphQL({
+      const response = await api.getUserMediaListCursorGraphQL({
         searchQuery: debouncedSearchQuery || undefined,
         categories,
         genreIds,

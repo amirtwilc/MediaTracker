@@ -3,6 +3,7 @@ package com.amir.mediatracker.service;
 import com.amir.mediatracker.dto.request.UserSettingsRequest;
 import com.amir.mediatracker.dto.response.UserSettingsResponse;
 import com.amir.mediatracker.entity.User;
+import com.amir.mediatracker.exception.ResourceNotFoundException;
 import com.amir.mediatracker.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -17,22 +18,20 @@ public class UserSettingsService {
     @Transactional
     public UserSettingsResponse updateSettings(Long userId, UserSettingsRequest request) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         user.setIsInvisible(request.getIsInvisible());
         user.setShowEmail(request.getShowEmail());
 
-        User saved = userRepository.save(user);
-
         return UserSettingsResponse.builder()
-                .isInvisible(saved.getIsInvisible())
-                .showEmail(saved.getShowEmail())
+                .isInvisible(user.getIsInvisible())
+                .showEmail(user.getShowEmail())
                 .build();
     }
 
     public UserSettingsResponse getSettings(Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         return UserSettingsResponse.builder()
                 .isInvisible(user.getIsInvisible())

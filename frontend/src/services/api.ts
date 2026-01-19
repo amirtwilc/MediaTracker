@@ -309,7 +309,8 @@ class ApiClient {
     return res.json();
   }
 
-  async getMyMediaListCursorGraphQL(params: {
+  async getUserMediaListCursorGraphQL(params: {
+    displayUserId?: number;
     searchQuery?: string;
     categories?: string[];
     genreIds?: number[];
@@ -325,46 +326,47 @@ class ApiClient {
     totalCount: number;
   }> {
     const graphqlQuery = `
-      query MyMediaListCursor($input: MyMediaListInput!) {
-        myMediaListCursor(input: $input) {
-          items {
+    query UserMediaListCursor($input: UserMediaListInput!) {
+      userMediaListCursor(input: $input) {
+        items {
+          id
+          mediaItem {
             id
-            mediaItem {
+            name
+            category
+            year
+            avgRating
+            genres {
               id
               name
-              category
-              year
-              avgRating
-              genres {
-                id
-                name
-              }
-              platforms {
-                id
-                name
-              }
-              createdAt
-              updatedAt
             }
-            experienced
-            wishToReexperience
-            rating
-            comment
-            addedAt
+            platforms {
+              id
+              name
+            }
+            createdAt
             updatedAt
           }
-          nextCursor {
-            name
-            id
-          }
-          hasMore
-          totalCount
+          experienced
+          wishToReexperience
+          rating
+          comment
+          addedAt
+          updatedAt
         }
+        nextCursor {
+          name
+          id
+        }
+        hasMore
+        totalCount
       }
-    `;
+    }
+  `;
 
     const variables = {
       input: {
+        displayUserId: params.displayUserId,
         searchQuery: params.searchQuery,
         categories: params.categories,
         genreIds: params.genreIds,
@@ -393,10 +395,11 @@ class ApiClient {
       throw new Error(result.errors[0].message);
     }
 
-    return result.data.myMediaListCursor;
+    return result.data.userMediaListCursor;
   }
 
-  async getMyMediaListSortedGraphQL(params: {
+  async getUserMediaListSortedGraphQL(params: {
+    displayUserId?: number;
     searchQuery?: string;
     categories?: string[];
     genreIds?: number[];
@@ -414,44 +417,45 @@ class ApiClient {
     size: number;
   }> {
     const graphqlQuery = `
-      query MyMediaListSorted($input: MyMediaListSortedInput!) {
-        myMediaListSorted(input: $input) {
-          content {
+    query UserMediaListSorted($input: UserMediaListSortedInput!) {
+      userMediaListSorted(input: $input) {
+        content {
+          id
+          mediaItem {
             id
-            mediaItem {
+            name
+            category
+            year
+            avgRating
+            genres {
               id
               name
-              category
-              year
-              avgRating
-              genres {
-                id
-                name
-              }
-              platforms {
-                id
-                name
-              }
-              createdAt
-              updatedAt
             }
-            experienced
-            wishToReexperience
-            rating
-            comment
-            addedAt
+            platforms {
+              id
+              name
+            }
+            createdAt
             updatedAt
           }
-          totalPages
-          totalElements
-          number
-          size
+          experienced
+          wishToReexperience
+          rating
+          comment
+          addedAt
+          updatedAt
         }
+        totalPages
+        totalElements
+        number
+        size
       }
-    `;
+    }
+  `;
 
     const variables = {
       input: {
+        displayUserId: params.displayUserId,
         searchQuery: params.searchQuery,
         categories: params.categories,
         genreIds: params.genreIds,
@@ -481,7 +485,7 @@ class ApiClient {
       throw new Error(result.errors[0].message);
     }
 
-    return result.data.myMediaListSorted;
+    return result.data.userMediaListSorted;
   }
 
   async addToMyListGraphQL(mediaItemId: number): Promise<UserMediaListItem> {
@@ -1029,17 +1033,8 @@ class ApiClient {
     return res.json();
   }
 
-  async getUserMediaList(userId: number, page = 0, size = 100): Promise<any> {
-    const res = await fetch(`${API_BASE}/users/${userId}/list?page=${page}&size=${size}`, {
-      headers: this.getHeaders(),
-    });
-
-    if (!res.ok) throw new Error('Failed to fetch user list');
-    return res.json();
-  }
-
   async getUserSettings(): Promise<any> {
-    const res = await fetch(`${API_BASE}/users/settings`, {
+    const res = await fetch(`${API_BASE}/users/me/settings`, {
       headers: this.getHeaders(),
     });
 
@@ -1048,7 +1043,7 @@ class ApiClient {
   }
 
   async updateUserSettings(settings: any): Promise<any> {
-    const res = await fetch(`${API_BASE}/users/settings`, {
+    const res = await fetch(`${API_BASE}/users/me/settings`, {
       method: 'PUT',
       headers: this.getHeaders(),
       body: JSON.stringify(settings),

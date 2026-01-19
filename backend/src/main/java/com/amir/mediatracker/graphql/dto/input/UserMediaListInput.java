@@ -6,7 +6,8 @@ import lombok.Data;
 import java.util.Set;
 
 @Data
-public class MyMediaListInput {
+public class UserMediaListInput {
+    private Long displayUserId;
     private String searchQuery;
     private Set<Category> categories;
     private Set<Long> genreIds;

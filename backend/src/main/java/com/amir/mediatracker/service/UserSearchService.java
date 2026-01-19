@@ -5,11 +5,10 @@ import com.amir.mediatracker.dto.request.AdvancedUserSearchRequest;
 import com.amir.mediatracker.dto.request.BasicUserSearchRequest;
 import com.amir.mediatracker.dto.response.UserProfileResponse;
 import com.amir.mediatracker.entity.User;
+import com.amir.mediatracker.entity.UserProfileStats;
 import com.amir.mediatracker.exception.BadRequestException;
-import com.amir.mediatracker.repository.UserFollowRepository;
-import com.amir.mediatracker.repository.UserMediaListRepository;
-import com.amir.mediatracker.repository.UserRepository;
-import com.amir.mediatracker.repository.UserSearchRepository;
+import com.amir.mediatracker.exception.ResourceNotFoundException;
+import com.amir.mediatracker.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.query.SortDirection;
@@ -77,10 +76,7 @@ public class UserSearchService {
     }
 
     private UserProfileResponse mapToProfileResponse(User user, Long currentUserId) {
-        long ratingsCount = userMediaListRepository.countByUserIdAndRatingIsNotNull(user.getId());
-        long followersCount = userFollowRepository.countByFollowingId(user.getId());
-        boolean isFollowing = userFollowRepository.existsByFollowerIdAndFollowingId(
-                currentUserId, user.getId());
+        UserProfileStats stats = userRepository.fetchUserProfileStats(user.getId(), currentUserId);
 
         return UserProfileResponse.builder()
                 .id(user.getId())
@@ -89,19 +85,28 @@ public class UserSearchService {
                 .role(user.getRole())
                 .createdAt(user.getCreatedAt())
                 .lastActive(user.getLastActive())
-                .ratingsCount(ratingsCount)
-                .followersCount(followersCount)
-                .isFollowing(isFollowing)
+                .ratingsCount(stats.ratingsCount())
+                .followersCount(stats.followersCount())
+                .isFollowing(stats.isFollowing())
                 .build();
     }
 
+    /**
+     * Returns a user profile statistics.
+     * May not return an invisible user, unless this is the same user.
+     * @param userId The id of the user for whom to return the profile
+     * @param currentUserId The id of the user that initiated the call
+     * @return UserProfileResponse
+     */
     @Transactional(readOnly = true)
     public UserProfileResponse getUserProfile(Long userId, Long currentUserId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        if (user.getIsInvisible() && !userId.equals(currentUserId)) {
-            throw new RuntimeException("User profile is private");
+        if (!userId.equals(currentUserId)) {
+            if (user.getIsInvisible()) {
+                throw new ResourceNotFoundException("User profile is private");
+            }
         }
 
         return mapToProfileResponse(user, currentUserId);

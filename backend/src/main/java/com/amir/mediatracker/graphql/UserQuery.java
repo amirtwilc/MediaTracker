@@ -83,11 +83,12 @@ public class UserQuery  {
     }
 
     @QueryMapping
-    public UserMediaListSearchResponse myMediaListCursor(
-            @Argument MyMediaListInput input,
+    public UserMediaListSearchResponse userMediaListCursor(
+            @Argument UserMediaListInput input,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
 
         return userMediaListService.getUserMediaListCursor(
+                input.getDisplayUserId(),
                 userPrincipal.getId(),
                 input.getSearchQuery(),
                 input.getCategories(),
@@ -101,11 +102,12 @@ public class UserQuery  {
     }
 
     @QueryMapping
-    public UserMediaListPageResult myMediaListSorted(
-            @Argument MyMediaListSortedInput input,
+    public UserMediaListPageResult userMediaListSorted(
+            @Argument UserMediaListSortedInput input,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
 
         var page = userMediaListService.getUserMediaListSorted(
+                input.getDisplayUserId(),
                 userPrincipal.getId(),
                 input.getSearchQuery(),
                 input.getCategories(),
