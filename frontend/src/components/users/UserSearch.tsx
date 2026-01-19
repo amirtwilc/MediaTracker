@@ -59,14 +59,14 @@ export const UserSearch: React.FC<UserSearchProps> = ({ onViewUser }) => {
     setCurrentPage(page);
 
     try {
-      const request = {
-        username: username || undefined,
-        adminOnly,
-        sortBy: sortConfig.by,
-        sortDirection: sortConfig.direction,
-      };
-
-      const response = await api.searchUsers(request, page, 20);
+      const response = await api.searchUsersBasic(
+        username || undefined,
+        adminOnly || false,
+        sortConfig.by,
+        sortConfig.direction,
+        page,
+        20
+      );
       setUsers(response.content);
       setTotalPages(response.totalPages);
     } catch (error) {
@@ -211,33 +211,21 @@ export const UserSearch: React.FC<UserSearchProps> = ({ onViewUser }) => {
             <div className="flex gap-2">
               <button
                 onClick={() => setAdminOnly(undefined)}
-                className={`px-3 py-1 rounded text-sm ${
-                  adminOnly === undefined
+                className={`px-3 py-1 rounded text-sm ${adminOnly === undefined
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                }`}
+                  }`}
               >
                 All Users
               </button>
               <button
                 onClick={() => setAdminOnly(true)}
-                className={`px-3 py-1 rounded text-sm ${
-                  adminOnly === true
+                className={`px-3 py-1 rounded text-sm ${adminOnly === true
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                }`}
+                  }`}
               >
                 Admins Only
-              </button>
-              <button
-                onClick={() => setAdminOnly(false)}
-                className={`px-3 py-1 rounded text-sm ${
-                  adminOnly === false
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                }`}
-              >
-                Users Only
               </button>
             </div>
           </div>
@@ -303,11 +291,10 @@ export const UserSearch: React.FC<UserSearchProps> = ({ onViewUser }) => {
                     <td className="px-4 py-3 text-white font-medium">{user.username}</td>
                     <td className="px-4 py-3">
                       <span
-                        className={`px-2 py-1 rounded text-xs ${
-                          user.role === 'ADMIN'
+                        className={`px-2 py-1 rounded text-xs ${user.role === 'ADMIN'
                             ? 'bg-purple-600 text-white'
                             : 'bg-gray-700 text-gray-200'
-                        }`}
+                          }`}
                       >
                         {user.role}
                       </span>
@@ -340,13 +327,13 @@ export const UserSearch: React.FC<UserSearchProps> = ({ onViewUser }) => {
                             Following
                           </button>
                         ) : (
-                            <button
-                              onClick={() => handleFollowClick(user.id, user.username)}
-                              className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs flex items-center gap-1"
-                            >
-                              <UserPlus size={14} />
-                              Follow
-                            </button>
+                          <button
+                            onClick={() => handleFollowClick(user.id, user.username)}
+                            className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs flex items-center gap-1"
+                          >
+                            <UserPlus size={14} />
+                            Follow
+                          </button>
                         )}
                       </div>
                     </td>

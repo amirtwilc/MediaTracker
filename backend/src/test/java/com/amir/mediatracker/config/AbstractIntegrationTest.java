@@ -54,10 +54,14 @@ public abstract class AbstractIntegrationTest {
     @Autowired
     protected MediaItemRepository mediaItemRepository;
     @Autowired
+    protected UserMediaListRepository userMediaListRepository;
+    @Autowired
+    protected UserFollowRepository userFollowRepository;
+    @Autowired
+    protected UserSearchRepository userSearchRepository;
+    @Autowired
     protected ObjectMapper objectMapper;
 
-    @Autowired
-    protected UserMediaListRepository userMediaListRepository;
 
     protected final User admin = TestJwtUtil.initAdmin();
     protected String adminToken;
@@ -70,6 +74,7 @@ public abstract class AbstractIntegrationTest {
         genreRepository.deleteAll();
         platformRepository.deleteAll();
         userMediaListRepository.deleteAll();
+        userFollowRepository.deleteAll();
         userRepository.deleteAll();
 
         userRepository.save(admin);

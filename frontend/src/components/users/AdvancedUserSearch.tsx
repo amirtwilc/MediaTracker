@@ -72,7 +72,7 @@ export const AdvancedUserSearch: React.FC<AdvancedUserSearchProps> = ({ onViewUs
                 cursorId: cursor?.id,
                 limit: 20,
             });
-            
+
             setMediaSearchResults(response.items);
             setMediaHasNextPage(response.hasMore);
             setMediaHasPrevPage(pageNum > 0);
@@ -149,17 +149,18 @@ export const AdvancedUserSearch: React.FC<AdvancedUserSearchProps> = ({ onViewUs
 
         try {
             const request = {
-                adminOnly: userAdminOnly,
-                sortBy: userSortConfig.by,
-                sortDirection: userSortConfig.direction,
                 itemRatingCriteria: selectedCriteria.map(c => ({
                     mediaItemId: c.mediaItem.id,
                     minRating: c.minRating,
                     maxRating: c.maxRating,
                 })),
+                sortBy: userSortConfig.by,
+                sortDirection: userSortConfig.direction,
+                page,
+                size: 20,
             };
 
-            const response = await api.searchUsers(request, page, 20);
+            const response = await api.searchUsersAdvanced(request);
             setUsers(response.content);
             setTotalPages(response.totalPages);
 

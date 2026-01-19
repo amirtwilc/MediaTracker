@@ -90,5 +90,8 @@ app:
     skip-limit: 100
   notification:
     fetch-limit: 50
+  user-profile:
+    advanced-search:
+      max-criteria: 5
 
 

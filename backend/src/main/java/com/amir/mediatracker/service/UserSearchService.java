@@ -1,147 +1,79 @@
 package com.amir.mediatracker.service;
 
-import com.amir.mediatracker.dto.Role;
-import com.amir.mediatracker.dto.request.UserSearchRequest;
+import com.amir.mediatracker.dto.UserSortBy;
+import com.amir.mediatracker.dto.request.AdvancedUserSearchRequest;
+import com.amir.mediatracker.dto.request.BasicUserSearchRequest;
 import com.amir.mediatracker.dto.response.UserProfileResponse;
 import com.amir.mediatracker.entity.User;
+import com.amir.mediatracker.exception.BadRequestException;
 import com.amir.mediatracker.repository.UserFollowRepository;
 import com.amir.mediatracker.repository.UserMediaListRepository;
 import com.amir.mediatracker.repository.UserRepository;
+import com.amir.mediatracker.repository.UserSearchRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.query.SortDirection;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Comparator;
-import java.util.List;
-import java.util.stream.Collectors;
-
-@Service
 @Slf4j
+@Service
 @RequiredArgsConstructor
 public class UserSearchService {
+
+    @Value("${app.user-profile.advanced-search.max-criteria}")
+    int advancedSearchMaxCriteria;
 
     private final UserRepository userRepository;
     private final UserMediaListRepository userMediaListRepository;
     private final UserFollowRepository userFollowRepository;
 
+    private final UserSearchRepository repository;
+
     @Transactional(readOnly = true)
-    public Page<UserProfileResponse> searchUsers(UserSearchRequest request, Long currentUserId,
-                                                 int page, int size) {
-        // Get all visible users
-        List<User> users;
+    public Page<UserProfileResponse> basicSearch(Long userId, BasicUserSearchRequest req) {
+        Pageable pageable = PageRequest.of(req.page(), req.size());
 
-        if (request.getUsername() != null && !request.getUsername().trim().isEmpty()) {
-            users = userRepository.findByIsInvisibleFalseAndUsernameContainingIgnoreCase(
-                    request.getUsername().trim());
-        } else {
-            users = userRepository.findByIsInvisibleFalse();
-        }
-
-        // Filter by admin
-        if (request.getAdminOnly() != null) {
-            Role targetRole = request.getAdminOnly() ? Role.ADMIN : Role.USER;
-            users = users.stream()
-                    .filter(u -> u.getRole() == targetRole)
-                    .collect(Collectors.toList());
-        }
-
-        // Advanced search by item ratings
-        if (request.getItemRatingCriteria() != null &&
-                !request.getItemRatingCriteria().isEmpty()) {
-            users = filterByItemRatings(users, request.getItemRatingCriteria());
-        }
-
-        // Map to response
-        List<UserProfileResponse> responses = users.stream()
-                .filter(u -> !u.getId().equals(currentUserId)) // Exclude current user
-                .map(u -> mapToProfileResponse(u, currentUserId))
-                .collect(Collectors.toList());
-
-        // Sort
-        responses = sortUsers(responses, request);
-
-        // Paginate
-        Pageable pageable = PageRequest.of(page, size);
-        int start = (int) pageable.getOffset();
-        int end = Math.min(start + pageable.getPageSize(), responses.size());
-
-        List<UserProfileResponse> pageContent = responses.subList(start, end);
-        return new PageImpl<>(pageContent, pageable, responses.size());
+        return repository.basicSearch(
+                userId,
+                normalize(req.username()),
+                req.adminOnly(),
+                defaultSort(req.sortBy()),
+                defaultDir(req.sortDirection()),
+                pageable
+        );
     }
 
-    private List<User> filterByItemRatings(List<User> users,
-                                           List<UserSearchRequest.ItemRatingCriteria> criteria) {
-        if (criteria.size() > 5) {
-            criteria = criteria.subList(0, 5); // Max 5 items
+    @Transactional(readOnly = true)
+    public Page<UserProfileResponse> advancedSearch(Long userId, AdvancedUserSearchRequest req) {
+        if (req.itemRatingCriteria().size() > advancedSearchMaxCriteria) {
+            throw new BadRequestException("itemRatingCriteria cannot be larger than " + advancedSearchMaxCriteria);
         }
 
-        List<Long> mediaItemIds = criteria.stream()
-                .map(UserSearchRequest.ItemRatingCriteria::getMediaItemId)
-                .collect(Collectors.toList());
-
-        List<UserSearchRequest.ItemRatingCriteria> finalCriteria = criteria;
-        return users.stream()
-                .filter(user -> {
-                    List<com.amir.mediatracker.entity.UserMediaList> userRatings =
-                            userMediaListRepository.findByUserIdAndMediaItemIdInAndRatingIsNotNull(
-                                    user.getId(), mediaItemIds);
-
-                    // User must have rated ALL specified items
-                    if (userRatings.size() != finalCriteria.size()) {
-                        return false;
-                    }
-
-                    // Check if all ratings are within specified ranges
-                    for (UserSearchRequest.ItemRatingCriteria criterion : finalCriteria) {
-                        boolean matchesRating = userRatings.stream()
-                                .anyMatch(rating ->
-                                        rating.getMediaItem().getId().equals(criterion.getMediaItemId()) &&
-                                                rating.getRating() >= criterion.getMinRating() &&
-                                                rating.getRating() <= criterion.getMaxRating()
-                                );
-                        if (!matchesRating) {
-                            return false;
-                        }
-                    }
-                    return true;
-                })
-                .collect(Collectors.toList());
+        Pageable pageable = PageRequest.of(req.page(), req.size());
+        return repository.advancedSearch(
+                userId,
+                req.itemRatingCriteria(),
+                defaultSort(req.sortBy()),
+                defaultDir(req.sortDirection()),
+                pageable
+        );
     }
 
-    private List<UserProfileResponse> sortUsers(List<UserProfileResponse> users,
-                                                UserSearchRequest request) {
-        String sortBy = request.getSortBy() != null ? request.getSortBy() : "lastActive";
-        boolean ascending = "asc".equalsIgnoreCase(request.getSortDirection());
+    private String normalize(String username) {
+        return (username == null || username.isBlank()) ? null : username;
+    }
 
-        Comparator<UserProfileResponse> comparator;
+    private UserSortBy defaultSort(UserSortBy sortBy) {
+        return sortBy != null ? sortBy : UserSortBy.LAST_ACTIVE;
+    }
 
-        switch (sortBy) {
-            case "registrationDate":
-                comparator = Comparator.comparing(UserProfileResponse::getCreatedAt);
-                break;
-            case "ratingsCount":
-                comparator = Comparator.comparing(UserProfileResponse::getRatingsCount);
-                break;
-            case "followersCount":
-                comparator = Comparator.comparing(UserProfileResponse::getFollowersCount);
-                break;
-            case "lastActive":
-            default:
-                comparator = Comparator.comparing(UserProfileResponse::getLastActive,
-                        Comparator.nullsLast(Comparator.naturalOrder()));
-                break;
-        }
-
-        if (!ascending) {
-            comparator = comparator.reversed();
-        }
-
-        return users.stream().sorted(comparator).collect(Collectors.toList());
+    private SortDirection defaultDir(SortDirection dir) {
+        return dir != null ? dir : SortDirection.DESCENDING;
     }
 
     private UserProfileResponse mapToProfileResponse(User user, Long currentUserId) {

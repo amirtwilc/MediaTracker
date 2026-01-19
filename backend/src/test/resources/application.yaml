@@ -2,8 +2,12 @@ jwt:
   secret: 6c607c38214901e634c42846c9e5ce576415e6ac9d4ca206a8a56bcc0d10fc966c607c38214901e634c42846c9e5ce576415e6ac9d4ca206a8a56bcc0d10fc96 #your-512-bit-secret-key-here-change-in-production
   expiration: 86400000  # 24 hours in milliseconds
 
+#changing these will affect the tests
 app:
   search:
-    max-limit: 2 #changing this will affect the test
+    max-limit: 2
   notification:
-    fetch-limit: 2 #changing this will affect the test
+    fetch-limit: 2
+  user-profile:
+    advanced-search:
+      max-criteria: 2

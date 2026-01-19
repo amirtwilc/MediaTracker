@@ -930,11 +930,90 @@ class ApiClient {
     return res.json();
   }
 
-  async searchUsers(request: any, page = 0, size = 20): Promise<any> {
-    const res = await fetch(`${API_BASE}/users/search?page=${page}&size=${size}`, {
+  async searchUsersBasic(
+    username?: string,
+    adminOnly: boolean = false,
+    sortBy: string = 'lastActive',
+    sortDirection: string = 'desc',
+    page: number = 0,
+    size: number = 20
+  ): Promise<any> {
+    const params = new URLSearchParams({
+      adminOnly: adminOnly.toString(),
+      page: page.toString(),
+      size: size.toString(),
+    });
+
+    if (username) {
+      params.append('username', username);
+    }
+
+    // Map frontend sort values to backend enum
+    const sortByMap: { [key: string]: string } = {
+      'registrationDate': 'REGISTRATION_DATE',
+      'lastActive': 'LAST_ACTIVE',
+      'ratingsCount': 'RATINGS',
+      'followersCount': 'FOLLOWERS',
+    };
+
+    if (sortBy && sortByMap[sortBy]) {
+      params.append('sortBy', sortByMap[sortBy]);
+    }
+
+    // Map frontend direction to backend enum
+    const directionMap: { [key: string]: string } = {
+      'asc': 'ASCENDING',
+      'desc': 'DESCENDING',
+    };
+
+    if (sortDirection && directionMap[sortDirection]) {
+      params.append('sortDirection', directionMap[sortDirection]);
+    }
+
+    const res = await fetch(`${API_BASE}/users/search/basic?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!res.ok) throw new Error('Failed to search users');
+    return res.json();
+  }
+
+  async searchUsersAdvanced(request: {
+    itemRatingCriteria: Array<{
+      mediaItemId: number;
+      minRating: number;
+      maxRating: number;
+    }>;
+    sortBy?: string;
+    sortDirection?: string;
+    page?: number;
+    size?: number;
+  }): Promise<any> {
+    // Map frontend sort values to backend enum
+    const sortByMap: { [key: string]: string } = {
+      'registrationDate': 'REGISTRATION_DATE',
+      'lastActive': 'LAST_ACTIVE',
+      'ratingsCount': 'RATINGS',
+      'followersCount': 'FOLLOWERS',
+    };
+
+    const directionMap: { [key: string]: string } = {
+      'asc': 'ASCENDING',
+      'desc': 'DESCENDING',
+    };
+
+    const body = {
+      itemRatingCriteria: request.itemRatingCriteria,
+      sortBy: request.sortBy ? sortByMap[request.sortBy] : 'LAST_ACTIVE',
+      sortDirection: request.sortDirection ? directionMap[request.sortDirection] : 'DESCENDING',
+      page: request.page ?? 0,
+      size: request.size ?? 20,
+    };
+
+    const res = await fetch(`${API_BASE}/users/search/advanced`, {
       method: 'POST',
       headers: this.getHeaders(),
-      body: JSON.stringify(request),
+      body: JSON.stringify(body),
     });
 
     if (!res.ok) throw new Error('Failed to search users');
