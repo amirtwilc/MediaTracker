@@ -12,6 +12,7 @@ import com.amir.mediatracker.repository.UserMediaListRepository;
 import com.amir.mediatracker.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -30,6 +31,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class UserMediaListService {
 
+    @Value("${app.search.max-limit}")
+    private int maxLimit;
+
     private final UserMediaListRepository userMediaListRepository;
 
     private final MediaItemRepository mediaItemRepository;
@@ -46,6 +50,21 @@ public class UserMediaListService {
         }
     }
 
+    /**
+     * Retrieve a user list with cursor pagination.
+     * Supports filtering by name, categories, genres, platforms and wishToExperience.
+     * @param displayUserId The user for which to display the list. Must be visible if different from requestorUserId
+     * @param requestorUserId The user who initiated the call
+     * @param searchQuery name search criteria. For example: "The Matri" might return the movie The Matrix
+     * @param categories Optional filter for categories. For example: Return only MOVIES and SERIES
+     * @param genreIds Optional filter for genres. For example: Return only items that contain exactly these genres: Action and Drama
+     * @param platformIds Optional filter for platforms. For example: Return only items that contain exactly these platforms: Netflix and HBO Max
+     * @param wishToExperience Optional filter to display only items that have not been experienced or are not checked with re-experience
+     * @param cursorName Name of the item used for cursoring. Providing this name results in providing a page that starts with next item
+     * @param cursorId Id of the item used for cursoring. Providing this name results in providing a page that starts with next item
+     * @param limit Number of items to return
+     * @return UserMediaListSearchResponse
+     */
     public UserMediaListSearchResponse getUserMediaListCursor(
             Long displayUserId,
             Long requestorUserId,
@@ -58,11 +77,13 @@ public class UserMediaListService {
             Long cursorId,
             int limit
     ) {
+        limit = Math.min(Math.max(limit, 1), maxLimit); //avoid negative and overflow
         displayUserId = decideWhichUserToShow(displayUserId, requestorUserId);
         Pageable pageable = PageRequest.of(0, limit + 1);
 
-        Set<Long> safeGenres = genreIds == null ? Set.of() : genreIds;
-        Set<Long> safePlatforms = platformIds == null ? Set.of() : platformIds;
+        // Safe inputs
+        Set<Long> safeGenres = (genreIds == null  || genreIds.isEmpty()) ? null : genreIds;
+        Set<Long> safePlatforms = (platformIds == null  || platformIds.isEmpty()) ? null : platformIds;
         Set<Category> safeCategories = (categories == null || categories.isEmpty()) ? null : categories;
         boolean safeWishToExperience = wishToExperience != null && wishToExperience;
         String safeSearchQuery = searchQuery == null ? "" : searchQuery;
@@ -70,12 +91,14 @@ public class UserMediaListService {
         Long safeCursorId = cursorId == null ? 0L : cursorId;
 
         // Get total count with filters
-        long totalCount = userMediaListRepository.countByUserIdWithFiltersSimple(
+        long totalCount = userMediaListRepository.countByUserIdWithFilters(
                 displayUserId,
                 safeSearchQuery,
                 safeCategories,
-                safeGenres.isEmpty() ? null : safeGenres,
-                safePlatforms.isEmpty() ? null : safePlatforms,
+                safeGenres,
+                safePlatforms,
+                safeGenres == null ? 0 : safeGenres.size(),
+                safePlatforms == null ? 0 : safePlatforms.size(),
                 safeWishToExperience
         );
 
@@ -84,10 +107,10 @@ public class UserMediaListService {
                 displayUserId,
                 safeSearchQuery,
                 safeCategories,
-                safeGenres.isEmpty() ? null : safeGenres,
-                safePlatforms.isEmpty() ? null : safePlatforms,
-                safeGenres.size(),
-                safePlatforms.size(),
+                safeGenres,
+                safePlatforms,
+                safeGenres == null ? 0 : safeGenres.size(),
+                safePlatforms == null ? 0 : safePlatforms.size(),
                 safeWishToExperience,
                 safeCursorName,
                 safeCursorId,
@@ -105,10 +128,10 @@ public class UserMediaListService {
 
         UserMediaListSearchResponse.Cursor nextCursor = null;
         if (hasMore && !items.isEmpty()) {
-            UserMediaList last = items.get(items.size() - 1);
+            UserMediaList last = items.getLast();
             nextCursor = new UserMediaListSearchResponse.Cursor(
                     last.getMediaItem().getName(),
-                    last.getId()
+                    last.getMediaItem().getId()
             );
         }
 

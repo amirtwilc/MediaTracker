@@ -92,6 +92,14 @@ public class UserQuery  {
                 .build();
     }
 
+    /**
+     * Returns entire list of a user with cursor pagination. Cursor is (name, id)
+     * If a user is not specified via displayUserId field, the calling user's list would return.
+     * If the user specified under displayUserId is not the calling user, a check for user visibility is performed
+     * @param input UserMediaListInput
+     * @param userPrincipal UserPrincipal
+     * @return UserMediaListSearchResponse
+     */
     @QueryMapping
     public UserMediaListSearchResponse userMediaListCursor(
             @Argument UserMediaListInput input,
@@ -107,7 +115,7 @@ public class UserQuery  {
                 input.getWishToExperience(),
                 input.getCursorName(),
                 input.getCursorId(),
-                input.getLimit() != null ? input.getLimit() : 20
+                input.getLimitOrDefault()
         );
     }
 
