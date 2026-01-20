@@ -14,4 +14,8 @@ public class SearchMediaInput {
     private String cursorName;
     private Long cursorId;
     private Integer limit;
+
+    public Integer getLimitOrDefault() {
+        return limit == null ? 20 : limit;
+    }
 }

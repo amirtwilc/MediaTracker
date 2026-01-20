@@ -64,8 +64,6 @@ public interface MediaItemRepository extends JpaRepository<MediaItem, Long> {
 
     @Query("""
         SELECT DISTINCT m FROM MediaItem m
-        LEFT JOIN m.genres g
-        LEFT JOIN m.platforms p
         WHERE LOWER(m.name) LIKE LOWER(CONCAT('%', :name, '%'))
         AND (:categories IS NULL OR m.category IN :categories)
         AND (:genreIds IS NULL OR EXISTS (

@@ -1,6 +1,8 @@
 package com.amir.mediatracker.graphql;
 
 import com.amir.mediatracker.aop.LogAround;
+import com.amir.mediatracker.dto.SearchMediaSortBy;
+import com.amir.mediatracker.dto.SortDirection;
 import com.amir.mediatracker.dto.response.*;
 import com.amir.mediatracker.entity.Genre;
 import com.amir.mediatracker.entity.Platform;
@@ -52,10 +54,18 @@ public class UserQuery  {
                 input.getPlatformIds(),
                 input.getCursorName(),
                 input.getCursorId(),
-                input.getLimit() != null ? input.getLimit() : 20
+                input.getLimitOrDefault()
         );
     }
 
+    /**
+     * Search media items, with sorting option: by CATEGORY, YEAR, AVG_RATING, NAME
+     * Default sorting is by NAME ASC
+     * Supports paging
+     * @param input SearchMediaSortedInput
+     * @param userPrincipal The user principal
+     * @return MediaPageResult
+     */
     @QueryMapping
     public MediaPageResult searchMediaItemsSorted(
             @Argument SearchMediaSortedInput input,
@@ -67,10 +77,10 @@ public class UserQuery  {
                 input.getCategories(),
                 input.getGenreIds(),
                 input.getPlatformIds(),
-                input.getPage() != null ? input.getPage() : 0,
-                input.getSize() != null ? input.getSize() : 20,
-                input.getSortBy() != null ? input.getSortBy() : "name",
-                input.getSortDirection() != null ? input.getSortDirection() : "ASC"
+                input.getPageOrDefault(),
+                input.getSizeOrDefault(),
+                input.getSortyByOrDefault(),
+                input.getSortyDirectionOrDefault()
         );
 
         return MediaPageResult.builder()

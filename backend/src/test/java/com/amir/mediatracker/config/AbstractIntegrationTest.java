@@ -3,17 +3,22 @@ package com.amir.mediatracker.config;
 import com.amir.mediatracker.entity.User;
 import com.amir.mediatracker.repository.*;
 import com.amir.mediatracker.security.JwtTokenProvider;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.batch.test.context.SpringBatchTest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.PostgreSQLContainer;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -82,5 +87,19 @@ public abstract class AbstractIntegrationTest {
 
         adminToken = TestJwtUtil.token(jwtTokenProvider, admin.getUsername(), "ROLE_ADMIN");
         userToken = TestJwtUtil.token(jwtTokenProvider, user.getUsername(), "ROLE_USER");
+    }
+
+    protected String graphql(String body) throws Exception {
+        return mockMvc.perform(post("/graphql")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body)
+                        .header("Authorization", "Bearer " + userToken))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+    }
+
+    protected <T> T mockMvcJsonToObject(String json, String jsonSubStringStart, Class<T> classType) throws JsonProcessingException {
+        json = json.substring(json.indexOf(jsonSubStringStart) + jsonSubStringStart.length(), json.length() - 2); //remove last 2 '}'
+        return objectMapper.readValue(json, classType);
     }
 }

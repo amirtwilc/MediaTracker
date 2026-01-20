@@ -164,25 +164,34 @@ export const SearchMedia: React.FC = () => {
     const categories = filterCategories.length > 0 ? filterCategories : undefined;
 
     if (paginationMode === 'offset' && sortConfig) {
-      // Use GraphQL sorted endpoint with offset pagination
-      const response = await api.searchMediaItemsSortedGraphQL({
-        query: debouncedQuery || '',
-        categories,
-        genreIds,
-        platformIds,
-        page: pageNum,
-        size: 20,
-        sortBy: sortConfig.key,
-        sortDirection: sortConfig.direction.toUpperCase(),
-      });
+  // Map frontend sort keys to backend enum
+  const sortByMap: { [key: string]: string } = {
+    'name': 'NAME',
+    'year': 'YEAR',
+    'avgRating': 'AVG_RATING',
+  };
 
-      return {
-        items: response.content,
-        cursor: null,
-        hasMore: pageNum < response.totalPages - 1,
-        totalCount: response.totalElements,
-      };
-    } else {
+  const backendSortBy = sortByMap[sortConfig.key] || 'NAME';
+
+  // Use GraphQL sorted endpoint with offset pagination
+  const response = await api.searchMediaItemsSortedGraphQL({
+    query: debouncedQuery || '',
+    categories,
+    genreIds,
+    platformIds,
+    page: pageNum,
+    size: 20,
+    sortBy: backendSortBy,
+    sortDirection: sortConfig.direction.toUpperCase(),
+  });
+
+  return {
+    items: response.content,
+    cursor: null,
+    hasMore: pageNum < response.totalPages - 1,
+    totalCount: response.totalElements,
+  };
+} else {
       // Use GraphQL cursor endpoint (unsorted, default by name)
       const response = await api.searchMediaItemsGraphQL({
         query: debouncedQuery || '',
@@ -339,21 +348,21 @@ export const SearchMedia: React.FC = () => {
   };
 
   const handleSort = (key: string) => {
-    setSortConfig(current => {
-      if (!current || current.key !== key) {
-        // First click: sort ascending, switch to offset pagination
-        setPaginationMode('offset');
-        return { key, direction: 'asc' };
-      } else if (current.direction === 'asc') {
-        // Second click: sort descending, stay in offset pagination
-        return { key, direction: 'desc' };
-      } else {
-        // Third click: remove sort, switch back to cursor pagination
-        setPaginationMode('cursor');
-        return null;
-      }
-    });
-  };
+  setSortConfig(current => {
+    if (!current || current.key !== key) {
+      // First click: sort ascending, switch to offset pagination
+      setPaginationMode('offset');
+      return { key, direction: 'asc' };
+    } else if (current.direction === 'asc') {
+      // Second click: sort descending, stay in offset pagination
+      return { key, direction: 'desc' };
+    } else {
+      // Third click: remove sort, switch back to cursor pagination
+      setPaginationMode('cursor');
+      return null;
+    }
+  });
+};
 
   const getSortIcon = (key: string) => {
     if (!sortConfig || sortConfig.key !== key) return null;
@@ -579,12 +588,7 @@ export const SearchMedia: React.FC = () => {
             <table className="w-full">
               <thead className="bg-gray-700 text-gray-300 text-sm">
                 <tr>
-                  <th
-                    className="px-4 py-3 text-left cursor-pointer hover:bg-gray-600"
-                    onClick={() => handleSort('category')}
-                  >
-                    Category {getSortIcon('category')}
-                  </th>
+                  <th className="px-4 py-3 text-left">Category</th>
                   <th
                     className="px-4 py-3 text-left cursor-pointer hover:bg-gray-600"
                     onClick={() => handleSort('name')}

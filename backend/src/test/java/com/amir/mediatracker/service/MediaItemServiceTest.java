@@ -1,6 +1,8 @@
 package com.amir.mediatracker.service;
 
 import com.amir.mediatracker.dto.Category;
+import com.amir.mediatracker.dto.SearchMediaSortBy;
+import com.amir.mediatracker.dto.SortDirection;
 import com.amir.mediatracker.dto.response.MediaItemResponse;
 import com.amir.mediatracker.dto.response.MediaSearchResponse;
 import com.amir.mediatracker.entity.Genre;
@@ -15,6 +17,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -23,7 +27,10 @@ import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -59,6 +66,36 @@ class MediaItemServiceTest {
                 .genres(Set.of(new Genre(1L, "Action", LocalDateTime.now())))
                 .platforms(Set.of(new Platform(1L, "Netflix", LocalDateTime.now())))
                 .build();
+    }
+
+    @Test
+    void searchMediaItemsSorted_marksItemsInUserList() {
+        MediaItem item1 = new MediaItem(); item1.setId(1L);
+        MediaItem item2 = new MediaItem(); item2.setId(2L);
+
+        when(mediaItemRepository.searchWithOffsetAndFilters(any(), any(), any(), any(), anyLong(), anyLong(), any()))
+                .thenReturn(new PageImpl<>(List.of(item1, item2)));
+
+        UserMediaList uml = new UserMediaList();
+        MediaItem mi = new MediaItem(); mi.setId(1L);
+        uml.setMediaItem(mi);
+
+        when(userMediaListRepository.findByUserIdAndMediaItemIdIn(eq(1L), any()))
+                .thenReturn(List.of(uml));
+
+        Page<MediaItemResponse> result =
+                mediaItemService.searchMediaItemsSorted(
+                        1L, null, null, null, null,
+                        0, 10, SearchMediaSortBy.NAME, SortDirection.ASC
+                );
+
+        assertTrue(result.getContent().stream()
+                .filter(i -> i.getId().equals(1L))
+                .findFirst().get().getInUserList());
+
+        assertFalse(result.getContent().stream()
+                .filter(i -> i.getId().equals(2L))
+                .findFirst().get().getInUserList());
     }
 
     @Test

@@ -1,6 +1,8 @@
 package com.amir.mediatracker.service;
 
 import com.amir.mediatracker.dto.Category;
+import com.amir.mediatracker.dto.SearchMediaSortBy;
+import com.amir.mediatracker.dto.SortDirection;
 import com.amir.mediatracker.dto.response.GenreResponse;
 import com.amir.mediatracker.dto.response.MediaItemResponse;
 import com.amir.mediatracker.dto.response.MediaSearchResponse;
@@ -136,45 +138,37 @@ public class MediaItemService {
             Set<Long> platformIds,
             int page,
             int size,
-            String sortBy,
-            String sortDirection
+            SearchMediaSortBy sortBy,
+            SortDirection sortDirection
     ) {
-        Set<Long> safeGenres = genreIds == null ? Set.of() : genreIds;
-        Set<Long> safePlatforms = platformIds == null ? Set.of() : platformIds;
+        size = Math.min(Math.max(size, 1), maxLimit); //avoid negative and overflow
+        // Safe inputs
+        Set<Long> safeGenres = (genreIds == null  || genreIds.isEmpty()) ? null : genreIds;
+        Set<Long> safePlatforms = (platformIds == null  || platformIds.isEmpty()) ? null : platformIds;
         Set<Category> safeCategories = (categories == null || categories.isEmpty()) ? null : categories;
 
         // Build sort
-        Sort.Direction direction = "DESC".equalsIgnoreCase(sortDirection)
+        Sort.Direction direction = SortDirection.DESC.equals(sortDirection)
                 ? Sort.Direction.DESC
                 : Sort.Direction.ASC;
 
-        String property;
-        switch (sortBy) {
-            case "year":
-                property = "year";
-                break;
-            case "category":
-                property = "category";
-                break;
-            case "avgRating":
-                property = "avgRating";
-                break;
-            case "name":
-            default:
-                property = "name";
-                break;
-        }
+        String property = switch (sortBy) {
+            case SearchMediaSortBy.YEAR -> "year";
+            case SearchMediaSortBy.CATEGORY -> "category";
+            case SearchMediaSortBy.AVG_RATING -> "avgRating";
+            default -> "name";
+        };
 
-        Sort sort = Sort.by(direction, property).and(Sort.by(Sort.Direction.ASC, "id"));
+        Sort sort = Sort.by(direction, property).and(Sort.by(Sort.Direction.ASC, "id")); //allows order consistency
         Pageable pageable = PageRequest.of(page, size, sort);
 
         Page<MediaItem> itemsPage = mediaItemRepository.searchWithOffsetAndFilters(
                 query,
                 safeCategories,
-                safeGenres.isEmpty() ? null : safeGenres,
-                safePlatforms.isEmpty() ? null : safePlatforms,
-                safeGenres.size(),
-                safePlatforms.size(),
+                safeGenres,
+                safePlatforms,
+                safeGenres == null ? 0 : safeGenres.size(),
+                safePlatforms == null ? 0 : safePlatforms.size(),
                 pageable
         );
 
@@ -194,33 +188,6 @@ public class MediaItemService {
 
         return itemsPage.map(this::mapToResponse);
     }
-
-    /*public List<MediaItemResponse> searchMediaItems(String query, Category category, int page, int size) {
-        Page<MediaItem> items;
-
-        Pageable pageable = PageRequest.of(page, size, Sort.by("name").ascending());
-        Set<Category> categories = category != null ? Set.of(category) : null;
-
-        items = mediaItemRepository.searchWithOffsetAndFilters(
-                query,
-                categories,
-                null,
-                null,
-                0,
-                0,
-                pageable
-        );
-
-        return items.stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
-    }*/
-
-    /*public MediaItemResponse getMediaItem(Long id) {
-        MediaItem item = mediaItemRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Media item not found"));
-        return mapToResponse(item);
-    }*/
 
     private MediaItemResponse mapToResponse(MediaItem item) {
         return MediaItemResponse.builder()
