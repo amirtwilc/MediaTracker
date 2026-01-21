@@ -35,7 +35,7 @@ public interface UserMediaListRepository extends JpaRepository<UserMediaList, Lo
             AND (:genreIds IS NULL OR g.id IN :genreIds)
             AND (:platformIds IS NULL OR p.id IN :platformIds)
             AND (:wishToExperience IS FALSE OR (uml.experienced = FALSE OR uml.wishToReexperience = TRUE))
-            GROUP BY uml.id, m.id, m.name, m.category, m.year, m.avgRating, m.createdAt, m.updatedAt, 
+            GROUP BY uml.id, m.id, m.name, m.category, m.year, m.avgRating, m.createdAt, m.updatedAt,
                      uml.experienced, uml.wishToReexperience, uml.rating, uml.addedAt, uml.updatedAt, uml.comment
             HAVING
                 (:genreCount = 0 OR COUNT(DISTINCT g.id) = :genreCount)

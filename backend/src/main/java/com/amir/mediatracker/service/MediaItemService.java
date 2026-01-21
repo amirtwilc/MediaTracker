@@ -154,7 +154,6 @@ public class MediaItemService {
 
         String property = switch (sortBy) {
             case SearchMediaSortBy.YEAR -> "year";
-            case SearchMediaSortBy.CATEGORY -> "category";
             case SearchMediaSortBy.AVG_RATING -> "avgRating";
             default -> "name";
         };

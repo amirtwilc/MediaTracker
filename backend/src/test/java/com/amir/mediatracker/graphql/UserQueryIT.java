@@ -9,6 +9,7 @@ import com.amir.mediatracker.entity.MediaItem;
 import com.amir.mediatracker.entity.Platform;
 import com.amir.mediatracker.entity.UserMediaList;
 import com.amir.mediatracker.graphql.dto.result.MediaPageResult;
+import com.amir.mediatracker.graphql.dto.result.UserMediaListPageResult;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -22,8 +23,195 @@ public class UserQueryIT extends AbstractIntegrationTest {
     private final String SEARCH_MEDIA_ITEMS_JSON_START = "\"searchMediaItems\":";
     private final String SEARCH_MEDIA_ITEMS_SORTED_JSON_START = "\"searchMediaItemsSorted\":";
     private final String USER_MEDIA_LIST_CURSOR_JSON_START = "\"userMediaListCursor\":";
+    private final String USER_MEDIA_LIST_SORTED_JSON_START = "\"userMediaListSorted\":";
+
+    @Test
+    void userMediaListSorted_whenSortByExperiencedAsc_shouldReturnResultsPaging_whileMaxLimitReached() throws Exception {
+        Genre action = genreRepository.save(new Genre(null, "Action", null));
+        Genre sciFi = genreRepository.save(new Genre(null, "Sci-Fi", null));
+        Platform netflix = platformRepository.save(new Platform(null, "Netflix", null));
+
+        MediaItem item1 = mediaItemRepository.save(MediaItem.builder()
+                .name("Matrix")
+                .category(Category.MOVIE)
+                .genres(Set.of(action, sciFi))
+                .platforms(Set.of(netflix))
+                .build());
+
+        MediaItem item2 = mediaItemRepository.save(MediaItem.builder()
+                .name("Matrix Reloaded")
+                .category(Category.MOVIE)
+                .genres(Set.of(action, sciFi))
+                .platforms(Set.of(netflix))
+                .build());
+
+        MediaItem item3 = mediaItemRepository.save(MediaItem.builder()
+                .name("Matrix Revolution")
+                .category(Category.MOVIE)
+                .genres(Set.of(action, sciFi))
+                .platforms(Set.of(netflix))
+                .build());
+
+        //should not return
+        MediaItem item4 = mediaItemRepository.save(MediaItem.builder()
+                .name("Interstellar")
+                .category(Category.MOVIE)
+                .genres(Set.of(sciFi))
+                .platforms(Set.of(netflix))
+                .build());
 
 
+        UserMediaList listItem1 = new UserMediaList();
+        listItem1.setUser(user);
+        listItem1.setExperienced(true);
+        listItem1.setMediaItem(item1);
+        userMediaListRepository.save(listItem1);
+        UserMediaList listItem2 = new UserMediaList();
+        listItem2.setUser(user);
+        listItem2.setExperienced(false);
+        listItem2.setMediaItem(item2);
+        userMediaListRepository.save(listItem2);
+        UserMediaList listItem3 = new UserMediaList();
+        listItem3.setUser(user);
+        listItem3.setExperienced(false);
+        listItem3.setMediaItem(item3);
+        userMediaListRepository.save(listItem3);
+        UserMediaList listItem4 = new UserMediaList();
+        listItem4.setUser(user);
+        listItem1.setExperienced(true);
+        listItem4.setMediaItem(item4);
+        userMediaListRepository.save(listItem4);
+
+        String resultJson = graphql("""
+                {
+                  "query": "query Search($input: UserMediaListSortedInput!) { userMediaListSorted(input: $input) { content { mediaItem { name } } totalPages totalElements } }",
+                  "variables": {
+                    "input": {
+                      "searchQuery": "Matrix",
+                      "size": 3,
+                      "sortBy": "EXPERIENCED",
+                      "sortDirection": "ASC"
+                    }
+                  }
+                }
+                """); //requested 3, but max limit is 2 (in application.yaml)
+
+        UserMediaListPageResult response = mockMvcJsonToObject(resultJson,
+                USER_MEDIA_LIST_SORTED_JSON_START,
+                UserMediaListPageResult.class);
+
+        assertEquals(2, response.getContent().size());
+        //Sort is by ASC, so should display unexperienced first. Also deterministic, so this will always come first
+        assertEquals("Matrix Reloaded", response.getContent().getFirst().getMediaItem().getName());
+        assertEquals(2, response.getTotalPages());
+        assertEquals(3, response.getTotalElements());
+    }
+
+    @Test
+    void userMediaListSorted_withQueryAndNoFiltersAndSortByYearDesc() throws Exception {
+
+        MediaItem item1 = mediaItemRepository.save(MediaItem.builder()
+                .name("Matrix")
+                .category(Category.MOVIE)
+                .year(1999)
+                .build());
+
+        MediaItem item2 = mediaItemRepository.save(MediaItem.builder()
+                .name("Matrix Reloaded")
+                .category(Category.MOVIE)
+                .year(2003)
+                .build());
+
+        UserMediaList listItem1 = new UserMediaList();
+        listItem1.setUser(user);
+        listItem1.setMediaItem(item1);
+        userMediaListRepository.save(listItem1);
+        UserMediaList listItem2 = new UserMediaList();
+        listItem2.setUser(user);
+        listItem2.setMediaItem(item2);
+        userMediaListRepository.save(listItem2);
+
+        String resultJson = graphql("""
+                {
+                  "query": "query Search($input: UserMediaListSortedInput!) { userMediaListSorted(input: $input) { content { mediaItem { id name } } totalPages totalElements } }",
+                  "variables": {
+                    "input": {
+                      "searchQuery": "Matrix",
+                      "size": 1,
+                      "sortBy": "YEAR",
+                      "sortDirection": "DESC"
+                    }
+                  }
+                }
+                """);
+
+        UserMediaListPageResult response = mockMvcJsonToObject(resultJson,
+                USER_MEDIA_LIST_SORTED_JSON_START,
+                UserMediaListPageResult.class);
+
+        assertEquals(1, response.getContent().size());
+        assertEquals("Matrix Reloaded", response.getContent().getFirst().getMediaItem().getName());
+        assertEquals(2, response.getTotalPages());
+        assertEquals(2, response.getTotalElements());
+    }
+
+    @Test
+    void userMediaListSorted_withGenreAndPlatformFilters_shouldMatchExactly() throws Exception {
+        Genre action = genreRepository.save(new Genre(null, "Action", null));
+        Genre drama = genreRepository.save(new Genre(null, "Drama", null));
+        Genre comedy = genreRepository.save(new Genre(null, "Comedy", null));
+
+        Platform netflix = platformRepository.save(new Platform(null, "Netflix", null));
+        Platform hbo = platformRepository.save(new Platform(null, "HBO", null));
+
+        MediaItem item1 = mediaItemRepository.save(MediaItem.builder()
+                .name("Qualified")
+                .category(Category.MOVIE)
+                .genres(Set.of(action, comedy, drama))
+                .platforms(Set.of(netflix, hbo))
+                .build());
+
+        MediaItem item2 = mediaItemRepository.save(MediaItem.builder()
+                .name("Unqualified")
+                .category(Category.MOVIE)
+                .genres(Set.of(action, drama))
+                .platforms(Set.of(netflix)) //no hbo
+                .build());
+
+        UserMediaList listItem1 = new UserMediaList();
+        listItem1.setUser(user);
+        listItem1.setMediaItem(item1);
+        userMediaListRepository.save(listItem1);
+        UserMediaList listItem2 = new UserMediaList();
+        listItem2.setUser(user);
+        listItem2.setMediaItem(item2);
+        userMediaListRepository.save(listItem2);
+
+        String resultJson = graphql("""
+                {
+                  "query": "query Search($input: UserMediaListSortedInput!) { userMediaListSorted(input: $input) { content { mediaItem { name } } totalElements } }",
+                  "variables": {
+                    "input": {
+                      "page": 0,
+                      "size": 10,
+                      "genreIds": [%d, %d],
+                      "platformIds": [%d, %d]
+                    }
+                  }
+                }
+                """.formatted(
+                action.getId(), drama.getId(), //deliberately no comedy.getID()
+                netflix.getId(), hbo.getId()
+        ));
+
+        UserMediaListPageResult response = mockMvcJsonToObject(resultJson,
+                USER_MEDIA_LIST_SORTED_JSON_START,
+                UserMediaListPageResult.class);
+
+        assertEquals(1, response.getTotalElements());
+        assertEquals(1, response.getContent().size());
+        assertEquals("Qualified", response.getContent().getFirst().getMediaItem().getName());
+    }
 
     @Test
     void userMediaListCursor_shouldReturnResultsWithCursor_whileMaxLimitReached() throws Exception {
@@ -124,7 +312,6 @@ public class UserQueryIT extends AbstractIntegrationTest {
                 USER_MEDIA_LIST_CURSOR_JSON_START,
                 UserMediaListSearchResponse.class);
 
-        System.out.println("extract: " + mediaItemRepository.findAll());
         assertEquals(1, response.getItems().size());
         assertTrue(response.isHasMore());
         assertEquals(item1.getName(), response.getNextCursor().getName());

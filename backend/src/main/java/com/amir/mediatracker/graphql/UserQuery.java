@@ -1,8 +1,6 @@
 package com.amir.mediatracker.graphql;
 
 import com.amir.mediatracker.aop.LogAround;
-import com.amir.mediatracker.dto.SearchMediaSortBy;
-import com.amir.mediatracker.dto.SortDirection;
 import com.amir.mediatracker.dto.response.*;
 import com.amir.mediatracker.entity.Genre;
 import com.amir.mediatracker.entity.Platform;
@@ -59,7 +57,7 @@ public class UserQuery  {
     }
 
     /**
-     * Search media items, with sorting option: by CATEGORY, YEAR, AVG_RATING, NAME
+     * Search media items, with sorting option: by YEAR, AVG_RATING, NAME
      * Default sorting is by NAME ASC
      * Supports paging
      * @param input SearchMediaSortedInput
@@ -119,6 +117,16 @@ public class UserQuery  {
         );
     }
 
+    /**
+     * Retrieves user list, with sorting option: by NAME, YEAR, EXPERIENCED, REEXPERIENCE, RATING
+     * Default sorting is by NAME ASC
+     * Supports paging
+     * If a user is not specified via displayUserId field, the calling user's list would return.
+     * If the user specified under displayUserId is not the calling user, a check for user visibility is performed
+     * @param input UserMediaListSortedInput
+     * @param userPrincipal UserPrincipal
+     * @return UserMediaListPageResult
+     */
     @QueryMapping
     public UserMediaListPageResult userMediaListSorted(
             @Argument UserMediaListSortedInput input,
@@ -132,10 +140,10 @@ public class UserQuery  {
                 input.getGenreIds(),
                 input.getPlatformIds(),
                 input.getWishToExperience(),
-                input.getPage() != null ? input.getPage() : 0,
-                input.getSize() != null ? input.getSize() : 20,
-                input.getSortBy() != null ? input.getSortBy() : "name",
-                input.getSortDirection() != null ? input.getSortDirection() : "ASC"
+                input.getPageOrDefault(),
+                input.getSizeOrDefault(),
+                input.getSortByOrDefault(),
+                input.getSortDirectionOrDefault()
         );
 
         return UserMediaListPageResult.builder()

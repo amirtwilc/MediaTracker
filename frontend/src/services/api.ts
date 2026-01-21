@@ -463,8 +463,8 @@ class ApiClient {
         wishToExperience: params.wishToExperience,
         page: params.page ?? 0,
         size: params.size ?? 20,
-        sortBy: params.sortBy ?? 'name',
-        sortDirection: params.sortDirection ?? 'ASC',
+        sortBy: params.sortBy ? params.sortBy.toUpperCase() : 'NAME',
+        sortDirection: params.sortDirection ? params.sortDirection.toUpperCase() : 'ASC',
       },
     };
 

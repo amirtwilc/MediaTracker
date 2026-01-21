@@ -17,6 +17,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     boolean existsByEmail(String email);
 
+    @Query("SELECT u.isInvisible FROM User u WHERE u.id = :id")
+    Optional<Boolean> isUserInvisible(Long userId);
+
     @Query("""
         SELECT new com.amir.mediatracker.entity.UserProfileStats(
             /* ratingsCount */

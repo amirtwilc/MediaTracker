@@ -1,6 +1,8 @@
 package com.amir.mediatracker.service;
 
 import com.amir.mediatracker.dto.Category;
+import com.amir.mediatracker.dto.SortDirection;
+import com.amir.mediatracker.dto.UserSearchMediaSortBy;
 import com.amir.mediatracker.dto.request.UpdateMediaListRequest;
 import com.amir.mediatracker.dto.response.*;
 import com.amir.mediatracker.entity.*;
@@ -143,6 +145,22 @@ public class UserMediaListService {
                 .build();
     }
 
+    /**
+     * Retrieves a user list with sorting option.
+     * Supports paging
+     * @param displayUserId The user for which to display the list. Must be visible if different from requestorUserId
+     * @param requestorUserId The user who initiated the call
+     * @param searchQuery name search criteria. For example: "The Matri" might return the movie The Matrix
+     * @param categories Optional filter for categories. For example: Return only MOVIES and SERIES
+     * @param genreIds Optional filter for genres. For example: Return only items that contain exactly these genres: Action and Drama
+     * @param platformIds Optional filter for platforms. For example: Return only items that contain exactly these platforms: Netflix and HBO Max
+     * @param wishToExperience Optional filter to display only items that have not been experienced or are not checked with re-experience
+     * @param page The page to return
+     * @param size The size of the page
+     * @param sortBy By which column to perform the sort - Name, Year, Experienced, Reexperience, Rating. Default is Name
+     * @param sortDirection Whether the sort it ASC or DESC. Default is ASC
+     * @return A page of UserMediaListResponse
+     */
     public Page<UserMediaListResponse> getUserMediaListSorted(
             Long displayUserId,
             Long requestorUserId,
@@ -153,68 +171,54 @@ public class UserMediaListService {
             Boolean wishToExperience,
             int page,
             int size,
-            String sortBy,
-            String sortDirection
+            UserSearchMediaSortBy sortBy,
+            SortDirection sortDirection
     ) {
+        size = Math.min(Math.max(size, 1), maxLimit); //avoid negative and overflow
         displayUserId = decideWhichUserToShow(displayUserId, requestorUserId);
-        Set<Long> safeGenres = genreIds == null ? Set.of() : genreIds;
-        Set<Long> safePlatforms = platformIds == null ? Set.of() : platformIds;
-        Set<Category> safeCategories = (categories == null || categories.isEmpty()) ? null : categories;
-        boolean safeWishToExperience = wishToExperience != null && wishToExperience;
-        String safeSearchQuery = searchQuery == null ? "" : searchQuery;
-        String safeSortBy = sortBy == null || sortBy.isEmpty() ? "name" : sortBy;
-        String safeSortDirection = sortDirection == null || sortDirection.isEmpty() ? "ASC" : sortDirection.toUpperCase();
 
-        // Build the Sort object
-        Sort sort = buildSort(safeSortBy, safeSortDirection);
-        Pageable pageable = PageRequest.of(page, size, sort);
+        // Safe inputs
+        String safeSearchQuery = searchQuery == null ? "" : searchQuery;
+        Set<Category> safeCategories = (categories == null || categories.isEmpty()) ? null : categories;
+        Set<Long> safeGenres = (genreIds == null  || genreIds.isEmpty()) ? null : genreIds;
+        Set<Long> safePlatforms = (platformIds == null  || platformIds.isEmpty()) ? null : platformIds;
+        boolean safeWishToExperience = wishToExperience != null && wishToExperience;
+        UserSearchMediaSortBy safeSortBy = sortBy == null ? UserSearchMediaSortBy.NAME : sortBy;
+
+        // Build sort
+        Sort.Direction direction = SortDirection.DESC.equals(sortDirection)
+                ? Sort.Direction.DESC
+                : Sort.Direction.ASC;
+        Sort sort = buildSort(safeSortBy, direction);
 
         // Fetch page with sorting
+        Pageable pageable = PageRequest.of(page, size, sort);
         Page<UserMediaList> itemsPage = userMediaListRepository.findByUserIdWithFiltersSorted(
                 displayUserId,
                 safeSearchQuery,
                 safeCategories,
-                safeGenres.isEmpty() ? null : safeGenres,
-                safePlatforms.isEmpty() ? null : safePlatforms,
-                safeGenres.size(),
-                safePlatforms.size(),
+                safeGenres,
+                safePlatforms,
+                safeGenres == null ? 0 : safeGenres.size(),
+                safePlatforms == null ? 0 : safePlatforms.size(),
                 safeWishToExperience,
                 pageable
         );
 
-        // Map to response
         return itemsPage.map(this::mapToResponse);
     }
 
-    private Sort buildSort(String sortBy, String sortDirection) {
-        Sort.Direction direction = "DESC".equalsIgnoreCase(sortDirection)
-                ? Sort.Direction.DESC
-                : Sort.Direction.ASC;
+    private Sort buildSort(UserSearchMediaSortBy sortBy, Sort.Direction direction) {
 
-        // Map frontend sort keys to entity properties
-        String property;
-        switch (sortBy) {
-            case "name":
-                property = "mediaItem.name";
-                break;
-            case "year":
-                property = "mediaItem.year";
-                break;
-            case "experienced":
-                property = "experienced";
-                break;
-            case "reexperience":
-                property = "wishToReexperience";
-                break;
-            case "rating":
-                property = "rating";
-                break;
-            default:
-                property = "mediaItem.name";
-        }
+        String property = switch (sortBy) {
+            case UserSearchMediaSortBy.YEAR -> "mediaItem.year";
+            case UserSearchMediaSortBy.EXPERIENCED -> "experienced";
+            case UserSearchMediaSortBy.REEXPERIENCE -> "wishToReexperience";
+            case UserSearchMediaSortBy.RATING -> "rating";
+            default -> "mediaItem.name";
+        };
 
-        // Add secondary sort by ID for stable ordering
-        return Sort.by(direction, property).and(Sort.by(Sort.Direction.ASC, "id"));
+        return Sort.by(direction, property).and(Sort.by(Sort.Direction.ASC, "id")); //allows order consistency
     }
 
     @Transactional
@@ -348,9 +352,9 @@ public class UserMediaListService {
         if (displayUserId == null) {
             displayUserId = requestorUserId;
         } else if (!displayUserId.equals(requestorUserId)) {
-            User displayUser = userRepository.findById(displayUserId)
+            boolean isInvisible = userRepository.isUserInvisible(displayUserId)
                     .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-            if (displayUser.getIsInvisible()) {
+            if (isInvisible) {
                 throw new ForbiddenException("User list is private");
             }
         }

@@ -155,6 +155,18 @@ export const MyMediaList: React.FC = () => {
     const categories = filterCategories.length > 0 ? filterCategories : undefined;
 
     if (paginationMode === 'offset' && sortConfig) {
+      // Map frontend sort keys to backend enum
+      const sortByMap: { [key: string]: string } = {
+        'name': 'NAME',
+        'year': 'YEAR',
+        'experienced': 'EXPERIENCED',
+        'reexperience': 'REEXPERIENCE',
+        'rating': 'RATING',
+      };
+
+      const backendSortBy = sortByMap[sortConfig.key] || 'NAME';
+      const backendSortDirection = sortConfig.direction === 'asc' ? 'ASC' : 'DESC';
+
       // Use GraphQL sorted endpoint with offset pagination
       const response = await api.getUserMediaListSortedGraphQL({
         searchQuery: debouncedSearchQuery || undefined,
@@ -164,8 +176,8 @@ export const MyMediaList: React.FC = () => {
         wishToExperience: wishToExperienceFilter || undefined,
         page: pageNum,
         size: 20,
-        sortBy: sortConfig.key,
-        sortDirection: sortConfig.direction.toUpperCase(),
+        sortBy: backendSortBy,
+        sortDirection: backendSortDirection,
       });
 
       return {
