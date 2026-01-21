@@ -4,13 +4,9 @@ import com.amir.mediatracker.aop.LogAround;
 import com.amir.mediatracker.dto.UserSortBy;
 import com.amir.mediatracker.dto.request.AdvancedUserSearchRequest;
 import com.amir.mediatracker.dto.request.BasicUserSearchRequest;
-import com.amir.mediatracker.dto.request.UserSearchRequest;
 import com.amir.mediatracker.dto.request.UserSettingsRequest;
-import com.amir.mediatracker.dto.response.UserMediaListResponse;
 import com.amir.mediatracker.dto.response.UserProfileResponse;
-import com.amir.mediatracker.dto.response.UserResponse;
 import com.amir.mediatracker.dto.response.UserSettingsResponse;
-import com.amir.mediatracker.entity.User;
 import com.amir.mediatracker.security.dto.UserPrincipal;
 import com.amir.mediatracker.service.UserMediaListService;
 import com.amir.mediatracker.service.UserSearchService;
@@ -21,12 +17,9 @@ import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.query.SortDirection;
 import org.springframework.data.domain.Page;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @LogAround
 @RestController

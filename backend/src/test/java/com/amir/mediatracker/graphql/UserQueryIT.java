@@ -2,20 +2,24 @@ package com.amir.mediatracker.graphql;
 
 import com.amir.mediatracker.config.AbstractIntegrationTest;
 import com.amir.mediatracker.dto.Category;
+import com.amir.mediatracker.dto.Role;
 import com.amir.mediatracker.dto.response.MediaSearchResponse;
+import com.amir.mediatracker.dto.response.UserFollowResponse;
 import com.amir.mediatracker.dto.response.UserMediaListSearchResponse;
-import com.amir.mediatracker.entity.Genre;
-import com.amir.mediatracker.entity.MediaItem;
-import com.amir.mediatracker.entity.Platform;
-import com.amir.mediatracker.entity.UserMediaList;
+import com.amir.mediatracker.dto.response.UserResponse;
+import com.amir.mediatracker.entity.*;
 import com.amir.mediatracker.graphql.dto.result.MediaPageResult;
 import com.amir.mediatracker.graphql.dto.result.UserMediaListPageResult;
+import com.fasterxml.jackson.core.type.TypeReference;
+import org.apache.commons.collections.CollectionUtils;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Set;
 
+import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class UserQueryIT extends AbstractIntegrationTest {
@@ -24,6 +28,131 @@ public class UserQueryIT extends AbstractIntegrationTest {
     private final String SEARCH_MEDIA_ITEMS_SORTED_JSON_START = "\"searchMediaItemsSorted\":";
     private final String USER_MEDIA_LIST_CURSOR_JSON_START = "\"userMediaListCursor\":";
     private final String USER_MEDIA_LIST_SORTED_JSON_START = "\"userMediaListSorted\":";
+    private final String MY_FOLLOWERS_JSON_START = "\"myFollowers\":";
+    private final String MY_FOLLOWING_JSON_START = "\"myFollowing\":";
+
+    @Test
+    void myFollowing_displayingEmailsProperly() throws Exception {
+
+        User followerWithEmail = new User();
+        followerWithEmail.setUsername("followerWithEmail");
+        followerWithEmail.setPasswordHash("1234");
+        followerWithEmail.setRole(Role.USER);
+        followerWithEmail.setShowEmail(true);
+        followerWithEmail.setEmail("show@test.com");
+        userRepository.save(followerWithEmail);
+
+        User followerWithoutEmail = new User();
+        followerWithoutEmail.setUsername("followerWithoutEmail");
+        followerWithoutEmail.setPasswordHash("1234");
+        followerWithoutEmail.setRole(Role.USER);
+        followerWithoutEmail.setShowEmail(false);
+        followerWithoutEmail.setEmail("doNotShow@test.com");
+        userRepository.save(followerWithoutEmail);
+
+        UserFollow userFollow1 = new UserFollow(null, user, followerWithEmail, null, LocalDateTime.now());
+        UserFollow userFollow2 = new UserFollow(null, user, followerWithoutEmail, null, LocalDateTime.now());
+        userFollowRepository.saveAll(List.of(userFollow1, userFollow2));
+
+        String resultJson = graphql("""
+                {
+                  "query": "query Search { myFollowing { user { email } } }"
+                }
+                """);
+
+        List<UserFollowResponse> responseList =
+                mockMvcJsonToObject(
+                        resultJson,
+                        MY_FOLLOWING_JSON_START,
+                        new TypeReference<>() {}
+                );
+
+        assertEquals(2, responseList.size());
+        assertThat(responseList).extracting(UserFollowResponse::getUser)
+                .extracting(UserResponse::getEmail)
+                .contains("show@test.com")
+                .doesNotContain("doNotShow@test.com");
+    }
+
+    @Test
+    void myFollowing_whenNoFollowers_shouldReturnEmptyList() throws Exception {
+
+        String resultJson = graphql("""
+                {
+                  "query": "query Search { myFollowing { user { email } } }"
+                }
+                """);
+
+        List<UserFollowResponse> responseList =
+                mockMvcJsonToObject(
+                        resultJson,
+                        MY_FOLLOWING_JSON_START,
+                        new TypeReference<>() {}
+                );
+
+        assertTrue(CollectionUtils.isEmpty(responseList));
+    }
+
+    @Test
+    void myFollowers_displayingEmailsProperly() throws Exception {
+
+        User followerWithEmail = new User();
+        followerWithEmail.setUsername("followerWithEmail");
+        followerWithEmail.setPasswordHash("1234");
+        followerWithEmail.setRole(Role.USER);
+        followerWithEmail.setShowEmail(true);
+        followerWithEmail.setEmail("show@test.com");
+        userRepository.save(followerWithEmail);
+
+        User followerWithoutEmail = new User();
+        followerWithoutEmail.setUsername("followerWithoutEmail");
+        followerWithoutEmail.setPasswordHash("1234");
+        followerWithoutEmail.setRole(Role.USER);
+        followerWithoutEmail.setShowEmail(false);
+        followerWithoutEmail.setEmail("doNotShow@test.com");
+        userRepository.save(followerWithoutEmail);
+
+        UserFollow userFollow1 = new UserFollow(null, followerWithEmail, user, null, LocalDateTime.now());
+        UserFollow userFollow2 = new UserFollow(null, followerWithoutEmail, user, null, LocalDateTime.now());
+        userFollowRepository.saveAll(List.of(userFollow1, userFollow2));
+
+        String resultJson = graphql("""
+                {
+                  "query": "query Search { myFollowers { email } }"
+                }
+                """);
+
+        List<UserResponse> responseList =
+                mockMvcJsonToObject(
+                        resultJson,
+                        MY_FOLLOWERS_JSON_START,
+                        new TypeReference<>() {}
+                );
+
+        assertEquals(2, responseList.size());
+        assertThat(responseList).extracting(UserResponse::getEmail)
+                .contains("show@test.com")
+                .doesNotContain("doNotShow@test.com");
+    }
+
+    @Test
+    void myFollowers_whenNoFollowers_shouldReturnEmptyList() throws Exception {
+
+        String resultJson = graphql("""
+                {
+                  "query": "query Search { myFollowers { id username } }"
+                }
+                """);
+
+        List<UserResponse> responseList =
+                mockMvcJsonToObject(
+                        resultJson,
+                        MY_FOLLOWERS_JSON_START,
+                        new TypeReference<>() {}
+                );
+
+        assertTrue(CollectionUtils.isEmpty(responseList));
+    }
 
     @Test
     void userMediaListSorted_whenSortByExperiencedAsc_shouldReturnResultsPaging_whileMaxLimitReached() throws Exception {

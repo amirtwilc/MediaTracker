@@ -63,7 +63,7 @@ public class UserSearchRepositoryImpl implements UserSearchRepository {
         String sql = """
             SELECT u.id,
                    u.username,
-                   u.email,
+                   CASE WHEN (u.show_email) THEN u.email ELSE NULL END,
                    u.role,
                    u.created_at,
                    u.last_active,
@@ -148,7 +148,7 @@ public class UserSearchRepositoryImpl implements UserSearchRepository {
                 )
                 SELECT u.id,
                        u.username,
-                       u.email,
+                       CASE WHEN (u.show_email) THEN u.email ELSE NULL END,
                        u.role,
                        u.created_at,
                        u.last_active,

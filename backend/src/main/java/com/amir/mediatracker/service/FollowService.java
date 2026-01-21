@@ -83,20 +83,20 @@ public class FollowService {
         return mapToResponse(saved);
     }
 
-    @Transactional //for LAZY
+    @Transactional(readOnly = true)
     public List<UserFollowResponse> getFollowing(Long userId) {
         List<UserFollow> following = userFollowRepository.findByFollowerId(userId);
         return following.stream()
                 .map(this::mapToResponse)
-                .collect(Collectors.toList());
+                .toList();
     }
 
-    @Transactional //for LAZY
+    @Transactional(readOnly = true)
     public List<UserResponse> getFollowers(Long userId) {
         List<UserFollow> followers = userFollowRepository.findByFollowingId(userId);
         return followers.stream()
                 .map(f -> mapUserToResponse(f.getFollower()))
-                .collect(Collectors.toList());
+                .toList();
     }
 
     private UserFollowResponse mapToResponse(UserFollow follow) {
@@ -112,7 +112,7 @@ public class FollowService {
         return UserResponse.builder()
                 .id(user.getId())
                 .username(user.getUsername())
-                .email(user.getEmail())
+                .email(user.getShowEmail() ? user.getEmail() : null)
                 .role(user.getRole())
                 .build();
     }

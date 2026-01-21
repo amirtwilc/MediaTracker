@@ -4,6 +4,7 @@ import com.amir.mediatracker.entity.User;
 import com.amir.mediatracker.repository.*;
 import com.amir.mediatracker.security.JwtTokenProvider;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.batch.test.context.SpringBatchTest;
@@ -99,7 +100,23 @@ public abstract class AbstractIntegrationTest {
     }
 
     protected <T> T mockMvcJsonToObject(String json, String jsonSubStringStart, Class<T> classType) throws JsonProcessingException {
-        json = json.substring(json.indexOf(jsonSubStringStart) + jsonSubStringStart.length(), json.length() - 2); //remove last 2 '}'
+        json = json.substring(
+                json.indexOf(jsonSubStringStart) + jsonSubStringStart.length(),
+                json.length() - 2 //remove last 2 '}'
+        );
         return objectMapper.readValue(json, classType);
+    }
+
+    protected <T> T mockMvcJsonToObject(
+            String json,
+            String jsonSubStringStart,
+            TypeReference<T> typeRef) throws JsonProcessingException {
+
+        json = json.substring(
+                json.indexOf(jsonSubStringStart) + jsonSubStringStart.length(),
+                json.length() - 2
+        );
+
+        return objectMapper.readValue(json, typeRef);
     }
 }

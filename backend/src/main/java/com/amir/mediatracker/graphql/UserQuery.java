@@ -155,15 +155,27 @@ public class UserQuery  {
                 .build();
     }
 
+    /**
+     * Retrieve all users who follow the calling user.
+     * Invisible users are still shown here
+     * @param user UserPrincipal
+     * @return List of UserResponse
+     */
     @QueryMapping
     public List<UserResponse> myFollowers(@AuthenticationPrincipal UserPrincipal user) {
         return followService.getFollowers(user.getId());
     }
 
+    /**
+     * Returns all users who are followed by calling user
+     * @param user UserPrincipal
+     * @return List of UserResponse
+     */
     @QueryMapping
     public List<UserFollowResponse> myFollowing(@AuthenticationPrincipal UserPrincipal user) {
         return followService.getFollowing(user.getId());
     }
+
 
     @QueryMapping
     public List<GenreResponse> myListGenres(
