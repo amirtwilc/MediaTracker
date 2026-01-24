@@ -1,15 +1,9 @@
 package com.amir.mediatracker.controller;
 
 import com.amir.mediatracker.config.AbstractIntegrationTest;
-import com.amir.mediatracker.dto.Category;
-import com.amir.mediatracker.dto.Role;
-import com.amir.mediatracker.entity.MediaItem;
 import com.amir.mediatracker.entity.User;
 import com.amir.mediatracker.entity.UserFollow;
-import com.amir.mediatracker.entity.UserMediaList;
 import org.junit.jupiter.api.Test;
-
-import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -55,7 +49,7 @@ public class UserProfileControllerIT extends AbstractIntegrationTest {
 
     @Test
     void getUserProfile_shouldReturnProfile() throws Exception {
-        User profileUser = userRepository.save(createUser("john"));
+        User profileUser = userRepository.save(saveUser("john"));
 
         userFollowRepository.save(
                 new UserFollow(null, user, profileUser, null, null));
@@ -77,7 +71,7 @@ public class UserProfileControllerIT extends AbstractIntegrationTest {
 
     @Test
     void getUserProfile_shouldReturn404_whenInvisible() throws Exception {
-        User hiddenUser = createUser("hidden");
+        User hiddenUser = saveUser("hidden");
         hiddenUser.setIsInvisible(true);
         userRepository.save(hiddenUser);
 
@@ -113,15 +107,5 @@ public class UserProfileControllerIT extends AbstractIntegrationTest {
                         """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content").isArray());
-    }
-
-    private User createUser(String username) {
-        User user = new User();
-        user.setUsername(username);
-        user.setEmail(username + "@example.com");
-        user.setPasswordHash("password");
-        user.setRole(Role.USER);
-        user.setLastActive(LocalDateTime.now());
-        return user;
     }
 }

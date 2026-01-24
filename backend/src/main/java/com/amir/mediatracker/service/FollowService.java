@@ -10,8 +10,10 @@ import com.amir.mediatracker.exception.DuplicateResourceException;
 import com.amir.mediatracker.exception.ResourceNotFoundException;
 import com.amir.mediatracker.repository.UserFollowRepository;
 import com.amir.mediatracker.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,15 +21,13 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 
-@Service
 @Slf4j
+@Service
+@RequiredArgsConstructor
 public class FollowService {
 
-    @Autowired
-    private UserFollowRepository userFollowRepository;
-
-    @Autowired
-    private UserRepository userRepository;
+    private final UserFollowRepository userFollowRepository;
+    private final UserRepository userRepository;
 
     @Transactional
     public UserFollowResponse followUser(Long userId, FollowRequest request) {
@@ -41,7 +41,6 @@ public class FollowService {
         User following = userRepository.findById(request.getUserId())
                 .orElseThrow(() -> new ResourceNotFoundException("User to follow not found"));
 
-        // Check if already following
         if (userFollowRepository.existsByFollowerIdAndFollowingId(userId, request.getUserId())) {
             throw new DuplicateResourceException("You are already following this user");
         }
@@ -51,21 +50,24 @@ public class FollowService {
         follow.setFollowing(following);
         follow.setMinimumRatingThreshold(request.getMinimumRatingThreshold());
 
-        UserFollow saved = userFollowRepository.save(follow);
-        log.info("User {} started following user {} with threshold {}",
-                userId, request.getUserId(), request.getMinimumRatingThreshold());
-
-        return mapToResponse(saved);
+        try {
+            UserFollow saved = userFollowRepository.saveAndFlush(follow);
+            log.info("User {} started following user {} with threshold {}",
+                    userId, request.getUserId(), request.getMinimumRatingThreshold());
+            return mapToResponse(saved);
+        } catch (DataIntegrityViolationException e) {
+            throw new DuplicateResourceException("You are already following this user");
+        }
     }
 
     @Transactional
     public void unfollowUser(Long followingId, Long userId) {
-        UserFollow follow = userFollowRepository
+        userFollowRepository
                 .findByFollowerIdAndFollowingId(userId, followingId)
-                .orElseThrow(() -> new ResourceNotFoundException("Follow relationship not found"));
-
-        userFollowRepository.delete(follow);
-        log.info("User {} unfollowed user {}", userId, followingId);
+                .ifPresent(follow -> {
+                    userFollowRepository.delete(follow);
+                    log.info("User {} unfollowed user {}", userId, followingId);
+                });
     }
 
     @Transactional

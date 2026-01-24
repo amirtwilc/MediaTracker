@@ -29,11 +29,11 @@ public class GlobalGraphQlExceptionHandler {
         log.error("Duplicate resource: {}", ex.getMessage());
         return GraphQLError.newError()
                 .message(ex.getMessage())
-                .errorType(ErrorType.INTERNAL_ERROR)
+                .errorType(ErrorType.BAD_REQUEST)
                 .build();
     }
 
-    @ExceptionHandler(BadRequestException.class)
+    @GraphQlExceptionHandler(BadRequestException.class)
     public GraphQLError handleBadRequest(BadRequestException ex) {
         log.error("Bad request: {}", ex.getMessage());
         return GraphQLError.newError()
@@ -42,7 +42,7 @@ public class GlobalGraphQlExceptionHandler {
                 .build();
     }
 
-    @ExceptionHandler(MethodArgumentNotValidException.class)
+    @GraphQlExceptionHandler(MethodArgumentNotValidException.class)
     public GraphQLError handleValidationErrors(MethodArgumentNotValidException ex) {
         log.error("Validation failed: {}", ex.getMessage());
         List errors = ex.getBindingResult()
@@ -57,7 +57,7 @@ public class GlobalGraphQlExceptionHandler {
                 .build();
     }
 
-    @ExceptionHandler(Exception.class)
+    @GraphQlExceptionHandler(Exception.class)
     public GraphQLError handleGenericException(Exception ex) {
         log.error("Generic exception: {}", ex.getMessage());
         return GraphQLError.newError()

@@ -1,6 +1,7 @@
 package com.amir.mediatracker.config;
 
 import com.amir.mediatracker.kafka.event.RatingEvent;
+import lombok.RequiredArgsConstructor;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -21,13 +22,16 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Configuration
+@RequiredArgsConstructor
 public class KafkaConfig {
+
+    private final KafkaTopicProperties kafkaTopicProperties;
 
     @Bean
     public NewTopic ratingTopic() {
-        return TopicBuilder.name("media-ratings")
-                .partitions(3)
-                .replicas(1)
+        return TopicBuilder.name(kafkaTopicProperties.getMediaRatingTopic())
+                .partitions(kafkaTopicProperties.getTopicPartitions())
+                .replicas(kafkaTopicProperties.getTopicReplicas())
                 .build();
     }
 }

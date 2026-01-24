@@ -1,36 +1,27 @@
 package com.amir.mediatracker.service;
 
-import com.amir.mediatracker.entity.UserMediaList;
+import com.amir.mediatracker.aop.LogAround;
 import com.amir.mediatracker.kafka.RatingProducer;
 import com.amir.mediatracker.kafka.event.RatingEvent;
-import com.amir.mediatracker.repository.UserMediaListRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 @Service
+@LogAround
+@RequiredArgsConstructor
 public class RatingService {
 
-    @Autowired
-    private UserMediaListRepository userMediaListRepository;
+    private final RatingProducer ratingProducer;
 
-    @Autowired
-    private RatingProducer ratingProducer;
-
-    @Transactional
-    public void rateMedia(Long userId, UserMediaList listItem) {
-
-        // Send Kafka event
-        RatingEvent event = new RatingEvent();
-        event.setUserId(userId);
-        event.setUsername(listItem.getUser().getUsername());
-        event.setMediaItemId(listItem.getMediaItem().getId());
-        event.setMediaItemName(listItem.getMediaItem().getName());
-        event.setRating(listItem.getRating());
-        event.setTimestamp(LocalDateTime.now());
-
+    /**
+     * Since rating is performed inside a DB transaction,
+     * the event must be sent to Kafka only once the transaction has commited.
+     * @param event RatingEvent
+     */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void handleRatingEvent(RatingEvent event) {
         ratingProducer.sendRatingEvent(event);
     }
 }

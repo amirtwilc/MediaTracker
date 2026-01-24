@@ -34,6 +34,10 @@ spring:
 
   kafka:
     bootstrap-servers: localhost:9092
+    topics:
+      media-rating-topic: media-ratings
+      topic-partitions: 3
+      topic-replicas: 1
     producer:
       key-serializer: org.apache.kafka.common.serialization.LongSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer

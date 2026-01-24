@@ -2,6 +2,12 @@ jwt:
   secret: 6c607c38214901e634c42846c9e5ce576415e6ac9d4ca206a8a56bcc0d10fc966c607c38214901e634c42846c9e5ce576415e6ac9d4ca206a8a56bcc0d10fc96 #your-512-bit-secret-key-here-change-in-production
   expiration: 86400000  # 24 hours in milliseconds
 
+spring:
+  kafka:
+    topics:
+      media-rating-topic: media-ratings
+      topic-partitions: 3
+      topic-replicas: 1
 #changing these will affect the tests
 app:
   search:

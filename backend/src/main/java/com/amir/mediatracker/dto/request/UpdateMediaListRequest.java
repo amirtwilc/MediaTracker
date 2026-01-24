@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 
 @Data
 public class UpdateMediaListRequest {
+    private Long id;
     private Boolean experienced;
     private Boolean wishToReexperience;
 

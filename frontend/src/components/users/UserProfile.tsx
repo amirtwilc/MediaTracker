@@ -306,7 +306,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ userId, onBack }) => {
       if (data.isFollowing) {
         try {
           const followData = await api.getFollowingGraphQL();
-          const followRelation = followData.find(f => f.user.id === userId);
+          const followRelation = followData.find(f => String(f.user.id) === String(userId));
           if (followRelation) {
             setCurrentThreshold(followRelation.minimumRatingThreshold);
             setNewThreshold(followRelation.minimumRatingThreshold);

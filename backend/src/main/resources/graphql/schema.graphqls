@@ -13,7 +13,7 @@ type Query {
 
 type Mutation {
   addMediaToList(mediaItemId: ID!): UserMediaListResponse
-  updateMediaListItem(id: ID!, request: UpdateMediaListRequest!): UserMediaListResponse
+  updateMediaListItem(request: UpdateMediaListRequest!): UserMediaListResponse
   removeMediaFromList(id: ID!): Boolean
 
   followUser(request: FollowRequest!): UserFollowResponse
@@ -100,6 +100,7 @@ type UserFollowResponse {
 }
 
 input UpdateMediaListRequest {
+  id: ID!
   experienced: Boolean
   wishToReexperience: Boolean
   rating: Int

@@ -11,7 +11,8 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "user_follows")
+@Table(name = "user_follows",
+        uniqueConstraints = @UniqueConstraint(columnNames = {"follower_id", "following_id"}))
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

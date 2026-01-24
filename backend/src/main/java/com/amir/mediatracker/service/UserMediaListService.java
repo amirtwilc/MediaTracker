@@ -9,12 +9,16 @@ import com.amir.mediatracker.entity.*;
 import com.amir.mediatracker.exception.DuplicateResourceException;
 import com.amir.mediatracker.exception.ForbiddenException;
 import com.amir.mediatracker.exception.ResourceNotFoundException;
+import com.amir.mediatracker.kafka.RatingProducer;
+import com.amir.mediatracker.kafka.event.RatingEvent;
 import com.amir.mediatracker.repository.MediaItemRepository;
 import com.amir.mediatracker.repository.UserMediaListRepository;
 import com.amir.mediatracker.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -24,7 +28,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -37,13 +40,15 @@ public class UserMediaListService {
     private int maxLimit;
 
     private final UserMediaListRepository userMediaListRepository;
-
     private final MediaItemRepository mediaItemRepository;
-
     private final UserRepository userRepository;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
-    private final RatingService ratingService;
-
+    /**
+     * Update last_active field in user table.
+     * Should be called whenever a user performs an action on it's list
+     * @param userId Id of the user
+     */
     private void updateLastActive(Long userId) {
         User user = userRepository.findById(userId).orElse(null);
         if (user != null) {
@@ -221,6 +226,13 @@ public class UserMediaListService {
         return Sort.by(direction, property).and(Sort.by(Sort.Direction.ASC, "id")); //allows order consistency
     }
 
+    /**
+     * Add a new media item to a user list.
+     * Item is saved with default values
+     * @param userId Id of the user for which to attach the media item
+     * @param mediaItemId The media item id to add to user list
+     * @return UserMediaListResponse
+     */
     @Transactional
     public UserMediaListResponse addMediaToList(Long userId, Long mediaItemId) {
         updateLastActive(userId);
@@ -230,51 +242,62 @@ public class UserMediaListService {
         MediaItem mediaItem = mediaItemRepository.findById(mediaItemId)
                 .orElseThrow(() -> new ResourceNotFoundException("Media item not found"));
 
-        // Check if already in list
-        Optional<UserMediaList> existing = userMediaListRepository
-                .findByUserIdAndMediaItemId(userId, mediaItemId);
-
-        if (existing.isPresent()) {
-            throw new DuplicateResourceException("Media item already in your list");
-        }
-
         UserMediaList listItem = new UserMediaList();
         listItem.setUser(user);
         listItem.setMediaItem(mediaItem);
         listItem.setExperienced(false);
         listItem.setWishToReexperience(false);
-
-        UserMediaList saved = userMediaListRepository.save(listItem);
-        return mapToResponse(saved);
+        try {
+            UserMediaList saved = userMediaListRepository.save(listItem);
+            return mapToResponse(saved);
+        } catch (DataIntegrityViolationException e) {
+            throw new DuplicateResourceException("Media item already in user list");
+        }
     }
 
+    /**
+     * Updates non-null values to UserMediaList table.
+     * Rating and Reexperience flag may only be set if experience flag is checked.
+     * Rating an item initiates an event to send a notification to followers.
+     * @param userId The user id for which the list belongs
+     * @param request UpdateMediaListRequest
+     * @return UserMediaListResponse
+     */
     @Transactional
     public UserMediaListResponse updateMediaListItem(
-            Long userId, Long listItemId, UpdateMediaListRequest request) {
+            Long userId, UpdateMediaListRequest request) {
         updateLastActive(userId);
         UserMediaList listItem = userMediaListRepository
-                .findByIdAndUserId(listItemId, userId)
+                .findByIdAndUserId(request.getId(), userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Media list item not found"));
 
         if (request.getExperienced() != null) {
             listItem.setExperienced(request.getExperienced());
-        }
-
-        if (request.getWishToReexperience() != null) {
-            listItem.setWishToReexperience(request.getWishToReexperience());
+            if (Boolean.FALSE.equals(request.getExperienced())) {
+                listItem.setWishToReexperience(false);
+                listItem.setRating(null);
+            }
         }
 
         if (request.getComment() != null) {
             listItem.setComment(request.getComment());
         }
 
-        // If rating is being set/updated, use RatingService to trigger Kafka event
-        if (request.getRating() != null) {
-            listItem.setRating(request.getRating());
-            ratingService.rateMedia(userId, listItem);
+        if (listItem.getExperienced() != null
+                && listItem.getExperienced()) {
+
+            if (request.getWishToReexperience() != null) {
+                listItem.setWishToReexperience(request.getWishToReexperience());
+            }
+
+            // If rating is being set/updated, trigger Kafka event
+            if (request.getRating() != null
+                    && !request.getRating().equals(listItem.getRating())) {
+                listItem.setRating(request.getRating());
+                applicationEventPublisher.publishEvent(createRatingEvent(userId, listItem));
+            }
         }
 
-        listItem.setUpdatedAt(LocalDateTime.now());
         UserMediaList saved = userMediaListRepository.save(listItem);
         return mapToResponse(saved);
     }
@@ -360,5 +383,23 @@ public class UserMediaListService {
         }
 
         return displayUserId;
+    }
+
+    /**
+     * Handles rating of a media item by sending a Kafka message
+     * @param userId The id of the user who rated the item
+     * @param listItem The list item that was rated
+     */
+    public RatingEvent createRatingEvent(Long userId, UserMediaList listItem) {
+
+        RatingEvent event = new RatingEvent();
+        event.setUserId(userId);
+        event.setUsername(listItem.getUser().getUsername());
+        event.setMediaItemId(listItem.getMediaItem().getId());
+        event.setMediaItemName(listItem.getMediaItem().getName());
+        event.setRating(listItem.getRating());
+        event.setTimestamp(LocalDateTime.now());
+
+        return event;
     }
 }

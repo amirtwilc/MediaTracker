@@ -546,39 +546,20 @@ class ApiClient {
 
   async updateMyListItemGraphQL(id: number, data: Partial<UserMediaListItem>): Promise<UserMediaListItem> {
     const graphqlQuery = `
-      mutation UpdateMediaListItem($id: ID!, $request: UpdateMediaListRequest!) {
-        updateMediaListItem(id: $id, request: $request) {
+      mutation UpdateMediaListItem($request: UpdateMediaListRequest!) {
+        updateMediaListItem(request: $request) {
           id
-          mediaItem {
-            id
-            name
-            category
-            year
-            avgRating
-            genres {
-              id
-              name
-            }
-            platforms {
-              id
-              name
-            }
-            createdAt
-            updatedAt
-          }
           experienced
           wishToReexperience
           rating
           comment
-          addedAt
-          updatedAt
         }
       }
     `;
 
     const variables = {
-      id: id.toString(),
       request: {
+        id: id.toString(),
         experienced: data.experienced,
         wishToReexperience: data.wishToReexperience,
         rating: data.rating,

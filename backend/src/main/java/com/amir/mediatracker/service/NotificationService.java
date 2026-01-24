@@ -11,8 +11,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.aspectj.weaver.ast.Not;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -35,7 +37,8 @@ public class NotificationService {
     private final MediaItemRepository mediaItemRepository;
 
     /**
-     * Create a notification for a user
+     * Create a notification for a user.
+     * If already exists - ignore (probably a retry attempt)
      * @param userId The id of the user that will see this notification
      * @param message The message displayed as part of this notification
      * @param mediaItemId The media item id for which this notification was created
@@ -45,26 +48,13 @@ public class NotificationService {
     @Transactional
     public void createNotification(Long userId, String message,
                                    Long mediaItemId, Short rating, Long ratedByUserId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        MediaItem mediaItem = mediaItemId != null
-                ? mediaItemRepository.findById(mediaItemId).orElse(null)
-                : null;
+        int rows = notificationRepository.insertIfNotExists(userId, ratedByUserId, mediaItemId, rating, message);
 
-        User ratedByUser = ratedByUserId != null
-                ? userRepository.findById(ratedByUserId).orElse(null)
-                : null;
-
-        Notification notification = new Notification();
-        notification.setUser(user);
-        notification.setMessage(message);
-        notification.setMediaItem(mediaItem);
-        notification.setRating(rating);
-        notification.setRatedByUser(ratedByUser);
-        notification.setIsRead(false);
-
-        notificationRepository.save(notification);
+        if (rows == 0) {
+            log.debug("Notification already exists (idempotent skip)");
+            return;
+        }
         log.info("Created notification for user {}: {}", userId, message);
     }
 
