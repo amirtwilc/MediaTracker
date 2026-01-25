@@ -3,7 +3,7 @@ spring:
     name: media-tracker
   datasource:
     platform: postgresql
-    url: jdbc:postgresql://localhost:5432/media_tracker_flyway
+    url: jdbc:postgresql://localhost:5432/media_tracker
     username: postgres
     password: mysecretpassword
     driver-class-name: org.postgresql.Driver

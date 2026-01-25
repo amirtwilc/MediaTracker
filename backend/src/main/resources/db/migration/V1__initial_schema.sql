@@ -86,7 +86,8 @@ CREATE TABLE notifications (
     rating SMALLINT,
     rated_by_user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
     is_read BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, media_item_id, rating)
 );
 
 -- Spring Batch tables for CSV processing
@@ -147,10 +148,13 @@ CREATE TABLE batch_step_execution (
 -- Indexes for performance
 CREATE INDEX idx_users_last_active ON users(last_active);
 CREATE INDEX idx_users_created_at ON users(created_at);
+CREATE INDEX idx_users_username ON users(username);
 CREATE INDEX idx_user_media_list_user ON user_media_list(user_id);
 CREATE INDEX idx_user_media_list_media ON user_media_list(media_item_id);
+CREATE INDEX idx_user_media_user_rating ON user_media_list(user_id, rating);
 CREATE INDEX idx_user_follows_follower ON user_follows(follower_id);
 CREATE INDEX idx_user_follows_following ON user_follows(following_id);
+CREATE INDEX idx_user_follows_pair ON user_follows(follower_id, following_id);
 CREATE INDEX idx_notifications_user ON notifications(user_id, is_read);
 CREATE INDEX idx_media_items_name ON media_items(name);
 CREATE INDEX idx_media_items_year ON media_items(year);

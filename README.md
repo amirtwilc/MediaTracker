@@ -72,7 +72,7 @@ When the startup is complete, you should see logs indicating that:
 * Frontend is being served
 
 You should also see "mediatracker" under Docker Desktop's Container's tab. 
-Check that all components have started. If one or more components have failed to start, you may try to start it again via the UI. 
+Check that all components have started. If one or more components have failed to start, you may try to start it again via Docker Desktop UI. 
 If still does not start, check the logs to identify the problem.
 
 #### Step 4: Access the application
@@ -84,7 +84,7 @@ http://localhost:8080
 
 #### Step 5: Login/Register to the app
 In order to login as an Admin, enter these values:  
-User: Admin  
+User: admin  
 Password: 123456  
 Note: These credentials are for local development only.  
 
