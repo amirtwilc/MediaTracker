@@ -78,3 +78,13 @@ export interface AuthContextType {
   logout: () => void;
   isAdmin: boolean;
 }
+
+export interface AuthContextType {
+  user: User | null;
+  token: string | null;
+  isLoading: boolean; // Add this property
+  login: (username: string, password: string) => Promise<void>;
+  register: (username: string, email: string, password: string) => Promise<void>;
+  logout: () => void;
+  isAdmin: boolean;
+}

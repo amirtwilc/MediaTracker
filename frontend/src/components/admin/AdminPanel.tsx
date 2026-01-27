@@ -422,7 +422,7 @@ export const AdminPanel: React.FC = () => {
       {/* Update Panel */}
       {activeTab === 'update' && (
         <div role="tabpanel" id="update-panel">
-          <UpdateMediaItem />
+          <UpdateMediaItem genres={genres} platforms={platforms} />
         </div>
       )}
 

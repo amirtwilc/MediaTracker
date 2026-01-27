@@ -1,18 +1,18 @@
 package com.amir.mediatracker.controller;
 
-import com.amir.mediatracker.security.JwtTokenProvider;
+import com.amir.mediatracker.aop.LogAround;
 import com.amir.mediatracker.dto.Role;
 import com.amir.mediatracker.dto.response.ErrorResponse;
 import com.amir.mediatracker.dto.response.MessageResponse;
 import com.amir.mediatracker.entity.User;
 import com.amir.mediatracker.repository.UserRepository;
+import com.amir.mediatracker.security.JwtTokenProvider;
 import com.amir.mediatracker.security.dto.JwtAuthenticationResponse;
 import com.amir.mediatracker.security.dto.LoginRequest;
 import com.amir.mediatracker.security.dto.RegisterRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -29,6 +29,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.LocalDateTime;
 
 @Slf4j
+@LogAround
 @RestController
 @RequestMapping("/auth")
 @RequiredArgsConstructor
@@ -77,14 +78,14 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody @Valid RegisterRequest request) {
         if (userRepository.existsByUsername(request.getUsername())) {
-            return ResponseEntity.badRequest()
+            return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(new ErrorResponse(HttpStatus.CONFLICT.value(),
                             "Username is already taken",
                             LocalDateTime.now()));
         }
 
         if (userRepository.existsByEmail(request.getEmail())) {
-            return ResponseEntity.badRequest()
+            return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(new ErrorResponse(HttpStatus.CONFLICT.value(),
                             "Email is already in use",
                             LocalDateTime.now()));
