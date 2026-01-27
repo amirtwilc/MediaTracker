@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { Notification } from '../../types';
-import { api } from '../api';
+import { api } from '../../api';
 import { StarRating } from '../common/StarRating';
 
 interface NotificationsPanelProps {

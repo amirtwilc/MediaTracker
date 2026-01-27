@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, AuthContextType } from '../types';
-import { ApiError, NetworkError, TimeoutError, ValidationError } from '../components/api/errors';
-import { api } from '../components/api';
+import { ApiError, NetworkError, TimeoutError, ValidationError } from '../api/errors';
+import { api } from '../api';
 
 const AuthContext = createContext<AuthContextType | null>(null);
 

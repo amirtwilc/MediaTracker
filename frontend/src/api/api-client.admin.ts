@@ -1,5 +1,5 @@
 import { BaseApiClient } from './api-client.base';
-import { Genre, Platform, MediaItem } from '../../types';
+import { Genre, Platform, MediaItem } from '../types';
 import { CSVImportResponse, JobStatus } from './api.types';
 
 export class AdminApiClient extends BaseApiClient {

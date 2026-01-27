@@ -1,5 +1,5 @@
 import { GraphQLApiClient } from './api-client.graphql';
-import { User, UserFollow } from '../../types';
+import { User, UserFollow } from '../types';
 
 export class FollowsApiClient extends GraphQLApiClient {
   /**

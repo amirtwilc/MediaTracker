@@ -1,5 +1,5 @@
 import { BaseApiClient } from './api-client.base';
-import { Notification } from '../../types';
+import { Notification } from '../types';
 
 export class NotificationsApiClient extends BaseApiClient {
   /**

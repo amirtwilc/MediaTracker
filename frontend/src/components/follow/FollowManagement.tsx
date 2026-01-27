@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User, UserFollow } from '../../types';
-import { api } from '../api';
+import { api } from '../../api';
 import { ConfirmModal } from '../common/ConfirmModal';
 
 interface FollowManagementProps {

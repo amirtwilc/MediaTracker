@@ -1,5 +1,5 @@
 import { GraphQLApiClient } from './api-client.graphql';
-import { UserMediaListItem } from '../../types';
+import { UserMediaListItem } from '../types';
 import {
   UserMediaListParams,
   UserMediaListSortedParams,

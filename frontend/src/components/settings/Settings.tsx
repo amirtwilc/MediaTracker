@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Save } from 'lucide-react';
-import { api } from '../api';
+import { api } from '../../api';
 
 export const Settings: React.FC = () => {
   const [isInvisible, setIsInvisible] = useState(false);

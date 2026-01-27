@@ -3,7 +3,7 @@ import { Plus, Check, Filter, ChevronDown, ChevronUp, ChevronLeft, ChevronRight,
 import { MediaItem, UserMediaListItem, Genre, Platform } from '../../types';
 import { StarRating } from '../common/StarRating';
 import { getCategoryColor } from '../../utils/categoryColors';
-import { api } from '../api';
+import { api } from '../../api';
 
 interface CachedPage {
   items: MediaItem[];

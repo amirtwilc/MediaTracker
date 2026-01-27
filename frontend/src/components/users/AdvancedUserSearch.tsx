@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Search, Plus, X } from 'lucide-react';
 import { MediaItem } from '../../types';
-import { UserProfile } from '../api/api.types';
-import { api } from '../api';
+import { UserProfile } from '../../api/api.types';
+import { api } from '../../api';
 import { getCategoryColor } from '../../utils/categoryColors';
 
 const MAX_ITEMS = 5;

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, UserPlus, Check, X } from 'lucide-react';
-import { UserProfile } from '../api/api.types';
-import { api } from '../api';
+import { UserProfile } from '../../api/api.types';
+import { api } from '../../api';
 import { ThresholdModal } from '../common/ThresholdModal';
 
 interface UserSearchProps {

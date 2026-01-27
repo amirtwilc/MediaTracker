@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ArrowLeft, UserPlus, Check, Filter, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Search, X } from 'lucide-react';
 import { UserMediaListItem } from '../../types';
-import { UserProfile as UserProfileType } from '../api/api.types';
-import { api } from '../api';
+import { UserProfile as UserProfileType } from '../../api/api.types';
+import { api } from '../../api';
 import { StarRating } from '../common/StarRating';
 import { useAuth } from '../../contexts/AuthContext';
 import { ThresholdModal } from '../common/ThresholdModal';

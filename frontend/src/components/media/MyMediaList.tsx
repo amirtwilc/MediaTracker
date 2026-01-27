@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Edit2, Trash2, X, Filter, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import { UserMediaListItem, Genre, Platform } from '../../types';
-import { api } from '../api';
+import { api } from '../../api';
 import { ConfirmModal } from '../common/ConfirmModal';
 import { StarRating } from '../common/StarRating';
 import { getCategoryColor } from '../../utils/categoryColors';

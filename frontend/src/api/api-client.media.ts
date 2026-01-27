@@ -1,5 +1,5 @@
 import { GraphQLApiClient } from './api-client.graphql';
-import { MediaItem } from '../../types';
+import { MediaItem } from '../types';
 import {
   SearchMediaParams,
   SearchMediaSortedParams,

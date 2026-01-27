@@ -1,5 +1,5 @@
 import { GraphQLApiClient } from './api-client.graphql';
-import { Genre, Platform } from '../../types';
+import { Genre, Platform } from '../types';
 import { MyListFiltersInput, AvailableFiltersInput } from './api.types';
 
 export class FiltersApiClient extends GraphQLApiClient {
