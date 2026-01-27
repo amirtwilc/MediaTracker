@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { MediaItem, Genre, Platform } from '../../types';
-import { api } from '../../services/api';
+import { api } from '../api';
 import { getCategoryColor } from '../../utils/categoryColors';
 import { ConfirmModal } from '../common/ConfirmModal';
 
@@ -52,7 +52,7 @@ export const UpdateMediaItem: React.FC = () => {
 
     try {
       // Use GraphQL for cursor-based search
-      const response = await api.searchMediaItemsGraphQL({
+      const response = await api.media.searchMediaItemsCursor({
         query: searchQuery || '',
         cursorName: cursor?.name,
         cursorId: cursor?.id,
@@ -106,8 +106,8 @@ export const UpdateMediaItem: React.FC = () => {
   const loadGenresAndPlatforms = async () => {
     try {
       const [genresData, platformsData] = await Promise.all([
-        api.getAllGenres(),
-        api.getAllPlatforms(),
+        api.admin.getAllGenres(),
+        api.admin.getAllPlatforms(),
       ]);
       setGenres(genresData);
       setPlatforms(platformsData);
@@ -129,7 +129,7 @@ export const UpdateMediaItem: React.FC = () => {
     if (!selectedItem) return;
 
     try {
-      await api.updateMediaItem(selectedItem.id, {
+      await api.admin.updateMediaItem(selectedItem.id, {
         category: selectedItem.category,
         name: selectedItem.name,
         year: year ? parseInt(year) : undefined,
@@ -150,7 +150,7 @@ export const UpdateMediaItem: React.FC = () => {
     if (!selectedItem) return;
 
     try {
-      await api.deleteMediaItem(selectedItem.id);
+      await api.admin.deleteMediaItem(selectedItem.id);
       setSuccessMessage('Item deleted successfully!');
       setSelectedItem(null);
       setDeleteConfirm(false);

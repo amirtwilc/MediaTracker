@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Save } from 'lucide-react';
-import { api } from '../../services/api';
+import { api } from '../api';
 
 export const Settings: React.FC = () => {
   const [isInvisible, setIsInvisible] = useState(false);
@@ -15,7 +15,7 @@ export const Settings: React.FC = () => {
 
   const loadSettings = async () => {
     try {
-      const response = await api.getUserSettings();
+      const response = await api.users.getUserSettings();
       // The backend returns a User object, not just settings
       // Check if the properties exist and set accordingly
       setIsInvisible(response.isInvisible ?? false);
@@ -34,7 +34,7 @@ export const Settings: React.FC = () => {
     setMessage('');
 
     try {
-      await api.updateUserSettings({
+      await api.users.updateUserSettings({
         isInvisible,
         showEmail,
       });

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Search, Plus, X } from 'lucide-react';
-import { MediaItem, UserProfile } from '../../types';
-import { api } from '../../services/api';
+import { MediaItem } from '../../types';
+import { UserProfile } from '../api/api.types';
+import { api } from '../api';
 import { getCategoryColor } from '../../utils/categoryColors';
 
 const MAX_ITEMS = 5;
@@ -66,7 +67,7 @@ export const AdvancedUserSearch: React.FC<AdvancedUserSearchProps> = ({ onViewUs
         setHasSearched(true);
 
         try {
-            const response = await api.searchMediaItemsGraphQL({
+            const response = await api.media.searchMediaItemsCursor({
                 query: searchQuery || '',
                 cursorName: cursor?.name,
                 cursorId: cursor?.id,
@@ -160,7 +161,7 @@ export const AdvancedUserSearch: React.FC<AdvancedUserSearchProps> = ({ onViewUs
                 size: 20,
             };
 
-            const response = await api.searchUsersAdvanced(request);
+            const response = await api.users.searchUsersAdvanced(request);
             setUsers(response.content);
             setTotalPages(response.totalPages);
 

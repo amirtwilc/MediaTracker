@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Upload, X, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { Genre, Platform } from '../../types';
-import { api } from '../../services/api';
+import { api } from '../api';
 import { UpdateMediaItem } from './UpdateMediaItem';
 
 export const AdminPanel: React.FC = () => {
@@ -54,8 +54,8 @@ export const AdminPanel: React.FC = () => {
   const loadGenresAndPlatforms = async () => {
     try {
       const [genresData, platformsData] = await Promise.all([
-        api.getAllGenres(),
-        api.getAllPlatforms(),
+        api.admin.getAllGenres(),
+        api.admin.getAllPlatforms(),
       ]);
       setGenres(genresData);
       setPlatforms(platformsData);
@@ -68,10 +68,10 @@ export const AdminPanel: React.FC = () => {
     e.preventDefault();
     
     try {
-      await api.createMediaItem({
+      await api.admin.createMediaItem({
         category,
         name,
-        year: year ? parseInt(year) : null,
+        year: year ? parseInt(year) : undefined,
         genreIds: selectedGenres,
         platformIds: selectedPlatforms,
       });
@@ -96,7 +96,7 @@ export const AdminPanel: React.FC = () => {
     }
 
     try {
-      const response = await api.uploadCSV(file);
+      const response = await api.admin.uploadCSV(file);
       setJobId(response.correlationId);
       setJobStatus(null);
       setUploadProgress({ 
@@ -112,7 +112,7 @@ export const AdminPanel: React.FC = () => {
       // Start polling for status
       const pollStatus = async () => {
         try {
-          const status = await api.getJobStatus(response.correlationId);
+          const status = await api.admin.getJobStatus(response.correlationId);
           setJobStatus(status);
 
           // Calculate progress

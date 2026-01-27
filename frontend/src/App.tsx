@@ -7,7 +7,7 @@ import { SearchMedia } from './components/media/SearchMedia';
 import { FollowManagement } from './components/follow/FollowManagement';
 import { AdminPanel } from './components/admin/AdminPanel';
 import { NotificationsPanel } from './components/notifications/NotificationsPanel';
-import { api } from './services/api';
+import { api } from './components/api';
 import { UserSearch } from './components/users/UserSearch';
 import { UserProfile } from './components/users/UserProfile';
 import { AdvancedUserSearch } from './components/users/AdvancedUserSearch';
@@ -32,7 +32,7 @@ const App: React.FC = () => {
 
   const loadUnreadCount = async () => {
     try {
-      const count = await api.getUnreadCount();
+      const count = await api.notifications.getUnreadCount();
       setUnreadCount(count);
     } catch (error) {
       console.error('Failed to load unread count', error);

@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Search, Plus, Check, Filter, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { Plus, Check, Filter, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { MediaItem, UserMediaListItem, Genre, Platform } from '../../types';
-import { api } from '../../services/api';
 import { StarRating } from '../common/StarRating';
 import { getCategoryColor } from '../../utils/categoryColors';
+import { api } from '../api';
 
 interface CachedPage {
   items: MediaItem[];
@@ -120,11 +120,11 @@ export const SearchMedia: React.FC = () => {
       const categories = filterCategories.length > 0 ? filterCategories : undefined;
 
       const [genresData, platformsData] = await Promise.all([
-        api.getAvailableMediaGenresGraphQL({
+        api.filters.getAvailableMediaGenres({
           query: debouncedQuery || undefined,
           categories
         }),
-        api.getAvailableMediaPlatformsGraphQL({
+        api.filters.getAvailableMediaPlatforms({
           query: debouncedQuery || undefined,
           categories
         }),
@@ -174,7 +174,7 @@ export const SearchMedia: React.FC = () => {
   const backendSortBy = sortByMap[sortConfig.key] || 'NAME';
 
   // Use GraphQL sorted endpoint with offset pagination
-  const response = await api.searchMediaItemsSortedGraphQL({
+  const response = await api.media.searchMediaItemsSorted({
     query: debouncedQuery || '',
     categories,
     genreIds,
@@ -193,7 +193,7 @@ export const SearchMedia: React.FC = () => {
   };
 } else {
       // Use GraphQL cursor endpoint (unsorted, default by name)
-      const response = await api.searchMediaItemsGraphQL({
+      const response = await api.media.searchMediaItemsCursor({
         query: debouncedQuery || '',
         categories,
         genreIds,
@@ -384,7 +384,7 @@ export const SearchMedia: React.FC = () => {
 
   const handleAdd = async (mediaItemId: number) => {
     try {
-      const result = await api.addToMyListGraphQL(mediaItemId);
+      const result = await api.userMedia.addToMyList(mediaItemId);
       setEditingAddedId(mediaItemId);
       setEditState({
         id: result.id, // Store the list item ID
@@ -412,7 +412,7 @@ export const SearchMedia: React.FC = () => {
     try {
       // Use the stored list item ID from editState
       if (editState.id) {
-        await api.updateMyListItemGraphQL(editState.id, editState);
+        await api.userMedia.updateMyListItem(editState.id, editState);
         setEditingAddedId(null);
         setEditState({});
       }

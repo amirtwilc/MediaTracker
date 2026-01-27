@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { Notification } from '../../types';
-import { api } from '../../services/api';
+import { api } from '../api';
 import { StarRating } from '../common/StarRating';
 
 interface NotificationsPanelProps {
@@ -19,7 +19,7 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ onClose 
 
   const loadNotifications = async () => {
     try {
-      const data = await api.getNotifications(showUnreadOnly);
+      const data = await api.notifications.getNotifications(showUnreadOnly);
       setNotifications(data);
     } catch (error) {
       console.error('Failed to load notifications', error);
@@ -30,7 +30,7 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ onClose 
 
   const handleMarkAsRead = async (id: number) => {
     try {
-      await api.markNotificationAsRead(id);
+      await api.notifications.markNotificationAsRead(id);
       await loadNotifications();
     } catch (error) {
       console.error('Failed to mark as read', error);
@@ -39,7 +39,7 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ onClose 
 
   const handleMarkAllAsRead = async () => {
     try {
-      await api.markAllNotificationsAsRead();
+      await api.notifications.markAllNotificationsAsRead();
       await loadNotifications();
     } catch (error) {
       console.error('Failed to mark all as read', error);

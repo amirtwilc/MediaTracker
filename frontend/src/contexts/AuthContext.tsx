@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, AuthContextType } from '../types';
-import { api } from '../services/api';
+import { ApiError, NetworkError, TimeoutError, ValidationError } from '../components/api/errors';
+import { api } from '../components/api';
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
@@ -11,7 +12,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     const storedToken = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
-    
+
     if (storedToken && storedUser) {
       setToken(storedToken);
       setUser(JSON.parse(storedUser));
@@ -19,24 +20,51 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const login = async (username: string, password: string) => {
-    const response = await api.login(username, password);
-    
-    setToken(response.accessToken);
-    const userData: User = {
-      id: response.userId,
-      username: response.username,
-      email: response.email,
-      role: response.role,
-    };
-    setUser(userData);
-    
-    localStorage.setItem('token', response.accessToken);
-    localStorage.setItem('user', JSON.stringify(userData));
+    try {
+      const response = await api.auth.login(username, password);
+
+      setToken(response.accessToken);
+      const userData: User = {
+        id: response.userId,
+        username: response.username,
+        email: response.email,
+        role: response.role,
+      };
+      setUser(userData);
+
+      localStorage.setItem('token', response.accessToken);
+      localStorage.setItem('user', JSON.stringify(userData));
+    } catch (error) {
+      handleError(error, 'Login failed');
+    }
   };
 
   const register = async (username: string, email: string, password: string) => {
-    await api.register(username, email, password);
+    try {
+      await api.auth.register(username, email, password);
+    } catch (error) {
+      handleError(error, 'Registration failed');
+    }
   };
+
+  const handleError = (error: any, defaultMessage: string): void => {
+    var errorMsg = defaultMessage;
+    if (error instanceof ApiError) {
+      console.error(`API Error (${error.statusCode}): ${error.message}`);
+      errorMsg = error.message;
+      // Access error.data for additional details
+    } else if (error instanceof NetworkError) {
+      errorMsg = 'Network error - check your connection';
+    } else if (error instanceof TimeoutError) {
+      errorMsg = 'Request timed out';
+    } else if (error instanceof ValidationError) {
+      console.error('Validation error:', error.message);
+      errorMsg = 'Invalid input - please check your data';
+    } else {
+      console.error('Unexpected error:', error);
+    }
+    throw new Error(`${errorMsg}`);
+  }
 
   const logout = () => {
     setUser(null);

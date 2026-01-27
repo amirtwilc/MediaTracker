@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ArrowLeft, UserPlus, Check, Filter, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Search, X } from 'lucide-react';
-import { UserProfile as UserProfileType, UserMediaListItem } from '../../types';
-import { api } from '../../services/api';
+import { UserMediaListItem } from '../../types';
+import { UserProfile as UserProfileType } from '../api/api.types';
+import { api } from '../api';
 import { StarRating } from '../common/StarRating';
 import { useAuth } from '../../contexts/AuthContext';
 import { ThresholdModal } from '../common/ThresholdModal';
@@ -139,7 +140,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ userId, onBack }) => {
       const backendSortDirection = sortConfig.direction === 'asc' ? 'ASC' : 'DESC';
 
       // Use GraphQL sorted endpoint with offset pagination
-      const response = await api.getUserMediaListSortedGraphQL({
+      const response = await api.userMedia.getUserMediaListSorted({
         displayUserId: userId,
         searchQuery: debouncedSearchQuery || undefined,
         categories,
@@ -157,7 +158,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ userId, onBack }) => {
       };
     } else {
       // Use GraphQL cursor endpoint (unsorted, default by name)
-      const response = await api.getUserMediaListCursorGraphQL({
+      const response = await api.userMedia.getUserMediaListCursor({
         displayUserId: userId,
         searchQuery: debouncedSearchQuery || undefined,
         categories,
@@ -299,13 +300,13 @@ export const UserProfile: React.FC<UserProfileProps> = ({ userId, onBack }) => {
 
   const loadProfile = async () => {
     try {
-      const data = await api.getUserProfile(userId);
+      const data = await api.users.getUserProfile(userId);
       setProfile(data);
       setIsFollowing(data.isFollowing);
       // Fetch current threshold if following
       if (data.isFollowing) {
         try {
-          const followData = await api.getFollowingGraphQL();
+          const followData = await api.follows.getFollowing();
           const followRelation = followData.find(f => String(f.user.id) === String(userId));
           if (followRelation) {
             setCurrentThreshold(followRelation.minimumRatingThreshold);
@@ -332,7 +333,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ userId, onBack }) => {
 
   const handleUpdateThreshold = async () => {
     try {
-      await api.updateFollowThresholdGraphQL(userId, newThreshold);
+      await api.follows.updateFollowThreshold(userId, newThreshold);
       setCurrentThreshold(newThreshold);
       setEditingThreshold(false);
       await loadProfile();
@@ -343,7 +344,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ userId, onBack }) => {
 
   const handleFollowConfirm = async (threshold: number | null) => {
     try {
-      await api.followUserGraphQL(userId, threshold === null ? 0 : threshold);
+      await api.follows.followUser(userId, threshold === null ? 0 : threshold);
       setIsFollowing(true);
       loadProfile();
       setFollowModal({ show: false });
@@ -358,7 +359,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ userId, onBack }) => {
 
   const handleUnfollowConfirm = async () => {
     try {
-      await api.unfollowUserGraphQL(userId);
+      await api.follows.unfollowUser(userId);
       setIsFollowing(false);
       setCurrentThreshold(null);
       setUnfollowConfirm(false);

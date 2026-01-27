@@ -8,7 +8,6 @@ import com.amir.mediatracker.dto.request.UserSettingsRequest;
 import com.amir.mediatracker.dto.response.UserProfileResponse;
 import com.amir.mediatracker.dto.response.UserSettingsResponse;
 import com.amir.mediatracker.security.dto.UserPrincipal;
-import com.amir.mediatracker.service.UserMediaListService;
 import com.amir.mediatracker.service.UserSearchService;
 import com.amir.mediatracker.service.UserSettingsService;
 import jakarta.validation.Valid;
@@ -29,7 +28,6 @@ import org.springframework.web.bind.annotation.*;
 public class UserProfileController {
 
     private final UserSearchService userSearchService;
-    private final UserMediaListService userMediaListService;
     private final UserSettingsService userSettingsService;
 
     /**

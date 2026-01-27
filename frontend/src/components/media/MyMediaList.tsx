@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Edit2, Trash2, X, Filter, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import { UserMediaListItem, Genre, Platform } from '../../types';
-import { api } from '../../services/api';
+import { api } from '../api';
 import { ConfirmModal } from '../common/ConfirmModal';
 import { StarRating } from '../common/StarRating';
 import { getCategoryColor } from '../../utils/categoryColors';
@@ -75,11 +75,11 @@ export const MyMediaList: React.FC = () => {
       const categories = filterCategories.length > 0 ? filterCategories : undefined;
       
       const [genresData, platformsData] = await Promise.all([
-        api.getMyListGenresGraphQL({ 
+        api.filters.getMyListGenres({ 
           searchQuery: debouncedSearchQuery || undefined, 
           categories 
         }),
-        api.getMyListPlatformsGraphQL({ 
+        api.filters.getMyListPlatforms({ 
           searchQuery: debouncedSearchQuery || undefined, 
           categories 
         }),
@@ -168,7 +168,7 @@ export const MyMediaList: React.FC = () => {
       const backendSortDirection = sortConfig.direction === 'asc' ? 'ASC' : 'DESC';
 
       // Use GraphQL sorted endpoint with offset pagination
-      const response = await api.getUserMediaListSortedGraphQL({
+      const response = await api.userMedia.getUserMediaListSorted({
         searchQuery: debouncedSearchQuery || undefined,
         categories,
         genreIds,
@@ -188,7 +188,7 @@ export const MyMediaList: React.FC = () => {
       };
     } else {
       // Use GraphQL cursor endpoint (unsorted, default by name)
-      const response = await api.getUserMediaListCursorGraphQL({
+      const response = await api.userMedia.getUserMediaListCursor({
         searchQuery: debouncedSearchQuery || undefined,
         categories,
         genreIds,
@@ -348,7 +348,7 @@ export const MyMediaList: React.FC = () => {
 
   const handleSaveEdit = async (id: number) => {
     try {
-      await api.updateMyListItemGraphQL(id, editState);
+      await api.userMedia.updateMyListItem(id, editState);
       
       setEditingId(null);
       setEditState({});
@@ -373,7 +373,7 @@ export const MyMediaList: React.FC = () => {
   const confirmDelete = async () => {
     if (deleteConfirm.id) {
       try {
-        await api.removeFromMyListGraphQL(deleteConfirm.id);
+        await api.userMedia.removeFromMyList(deleteConfirm.id);
         
         // Complete state reset
         setPageCache({});

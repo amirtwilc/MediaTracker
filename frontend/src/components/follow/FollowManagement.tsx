@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User, UserFollow } from '../../types';
-import { api } from '../../services/api';
+import { api } from '../api';
 import { ConfirmModal } from '../common/ConfirmModal';
 
 interface FollowManagementProps {
@@ -25,8 +25,8 @@ export const FollowManagement: React.FC<FollowManagementProps> = ({ onViewUser }
   const loadData = async () => {
     try {
       const [followingData, followersData] = await Promise.all([
-        api.getFollowingGraphQL(),
-        api.getFollowersGraphQL(),
+        api.follows.getFollowing(),
+        api.follows.getFollowers(),
       ]);
       setFollowing(followingData);
       setFollowers(followersData);
@@ -41,7 +41,7 @@ export const FollowManagement: React.FC<FollowManagementProps> = ({ onViewUser }
     if (!unfollowConfirm.userId) return;
     
     try {
-      await api.unfollowUserGraphQL(unfollowConfirm.userId);
+      await api.follows.unfollowUser(unfollowConfirm.userId);
       await loadData();
       setUnfollowConfirm({ show: false, userId: null, username: '' });
     } catch (error) {
