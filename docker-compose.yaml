@@ -66,6 +66,8 @@ services:
   frontend:
     build:
       context: ./frontend
+      args:
+        REACT_APP_BASE_URL: http://localhost:8080/media-tracker
     container_name: mediatracker-frontend
     ports:
       - "3000:80"
