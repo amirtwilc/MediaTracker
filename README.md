@@ -2,6 +2,19 @@
 Track all the media you have experienced, or want to experience, in one place.  
 Currently supported media types: Movies, TV Series, and Video Games.
 
+## Table of Contents
+
+* [Overview](#overview)
+* [Quick Start (Run with Docker)](#quick-start-run-with-docker)
+* [Live Demo (Free-Tier Cloud Deployment)](#live-demo-free-tier-cloud-deployment)
+* [Architecture](#architecture)
+* [Core Motivation](#core-motivation)
+* [What This Project Demonstrates](#what-this-project-demonstrates)
+* [Technologies](#technologies)
+* [Core decisions](#core-decisions)
+* [Next Steps](#next-steps)
+* [Author](#author)
+
 ## Overview
 This application allows users to maintain a personal list of media they want to track.  
 Each item in a user’s list may include: 
@@ -119,6 +132,24 @@ docker compose up --build
 ```
 3. If ports 3000 or 8080 are already in use, stop the conflicting applications
 
+## Live Demo (Free-Tier Cloud Deployment)
+🔗 https://amirtwilc.github.io/MediaTracker/
+
+This project is deployed to the cloud to allow immediate access without requiring local Docker setup.  
+The system is deployed in a distributed manner across multiple cloud providers, with each component hosted independently.  
+As this is a demonstration project, all components are hosted on free-tier plans, which may result in slower response times.
+
+**Cloud providers used in this deployment:**
+- **Frontend** → GitHub Pages
+- **Backend** → Render
+- **Database (PostgreSQL)** → Neon
+- **Message Broker (Kafka)** → Confluent Cloud
+
+Note: Render’s free tier suspends services after 15 minutes of inactivity, resulting in a cold start that may take up to 1–2 minutes.   
+To mitigate this behavior, UptimeRobot is configured to periodically call the /health endpoint.  
+UptimeRobot also provides availability monitoring and downtime notifications.
+
+
 ## Architecture
 The project is implemented as a monolith for simplicity and clarity.
 
@@ -215,7 +246,6 @@ The solution for both latter cases is probably to limit the new items allowed to
 * Allow users to suggest new items, potentially via a centralized suggestion area where the community can review and vote
 * Testing: Maintain and expand test coverage, enhance integration tests, and introduce load and stress testing
 * Scalability improvements: Introduce caching, optimize database queries, and evaluate a potential transition to a microservices architecture
-* Deploy the application to a publicly accessible environment
 
 ## Author
 
