@@ -7,9 +7,7 @@ export abstract class BaseApiClient {
   private tokenTimestamp: number = 0;
   private readonly TOKEN_CACHE_DURATION = 5000; // 5 seconds
 
-  /**
-   * Gets authentication token with caching to reduce localStorage access
-   */
+  // Gets authentication token with caching to reduce localStorage access
   protected getToken(): string | null {
     const now = Date.now();
     
@@ -25,9 +23,6 @@ export abstract class BaseApiClient {
     return this.tokenCache;
   }
 
-  /**
-   * Sets the authentication token
-   */
   public setToken(token: string | null): void {
     if (token) {
       localStorage.setItem(STORAGE_KEYS.TOKEN, token);
@@ -40,16 +35,11 @@ export abstract class BaseApiClient {
     }
   }
 
-  /**
-   * Clears the authentication token
-   */
   public clearToken(): void {
     this.setToken(null);
   }
 
-  /**
-   * Builds headers for requests
-   */
+  // Builds headers for requests
   protected getHeaders(includeAuth = true, additionalHeaders?: HeadersInit): HeadersInit {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -69,9 +59,6 @@ export abstract class BaseApiClient {
     return headers;
   }
 
-  /**
-   * Handles API errors with detailed information
-   */
   protected async handleError(res: Response): Promise<never> {
     let errorData: any = null;
     let errorMessage = `HTTP ${res.status}: ${res.statusText}`;
@@ -120,7 +107,6 @@ export abstract class BaseApiClient {
         await this.handleError(res);
       }
 
-      // Handle empty responses (204 No Content)
       if (res.status === 204) {
         return undefined as T;
       }
@@ -150,9 +136,6 @@ export abstract class BaseApiClient {
     }
   }
 
-  /**
-   * Makes a GET request
-   */
   protected async get<T>(
     endpoint: string,
     params?: Record<string, any>,
@@ -168,9 +151,6 @@ export abstract class BaseApiClient {
     });
   }
 
-  /**
-   * Makes a POST request
-   */
   protected async post<T>(
     endpoint: string,
     body?: any,
@@ -183,9 +163,6 @@ export abstract class BaseApiClient {
     });
   }
 
-  /**
-   * Makes a PUT request
-   */
   protected async put<T>(
     endpoint: string,
     body?: any,
@@ -198,9 +175,6 @@ export abstract class BaseApiClient {
     });
   }
 
-  /**
-   * Makes a DELETE request
-   */
   protected async delete<T>(
     endpoint: string,
     includeAuth = true
@@ -211,9 +185,6 @@ export abstract class BaseApiClient {
     });
   }
 
-  /**
-   * Uploads a file using FormData
-   */
   protected async uploadFile<T>(
     endpoint: string,
     file: File,

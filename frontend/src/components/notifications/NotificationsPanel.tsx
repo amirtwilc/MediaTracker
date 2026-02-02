@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { X, Bell, BellOff, CheckCircle, AlertCircle, Loader2, RefreshCw } from 'lucide-react';
-import { Notification } from '../../types';
+import type { Notification } from '../../types';
 import { api, ApiError, NetworkError, TimeoutError } from '../../api';
 import { StarRating } from '../common/StarRating';
 

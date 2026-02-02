@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Edit2, Trash2, X } from 'lucide-react';
-import { UserMediaListItem } from '../../types';
+import type { UserMediaListItem } from '../../types';
 import { api } from '../../api';
 import { ConfirmModal } from '../common/ConfirmModal';
 import { StarRating } from '../common/StarRating';
@@ -13,7 +13,7 @@ import { useMediaPagination } from '../../hooks/useMediaPagination';
 import { useFilters } from '../../hooks/useFilters';
 import { useDebounce } from '../../hooks/useDebounce';
 import { useSort } from '../../hooks/useSort';
-import { Cursor, PaginationMode, SortConfig, MediaFilters as MediaFiltersType } from '../../types/media.types';
+import type { Cursor, PaginationMode, SortConfig, MediaFilters as MediaFiltersType } from '../../types/media.types';
 
 export const MyMediaList: React.FC = () => {
   // Filters and search

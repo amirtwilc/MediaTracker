@@ -3,9 +3,7 @@ import { validateRequired } from './api.utils';
 import { AuthResponse, LoginRequest, RegisterRequest } from './api.types';
 
 export class AuthApiClient extends BaseApiClient {
-  /**
-   * Login user
-   */
+
   async login(username: string, password: string): Promise<AuthResponse> {
     validateRequired({ username, password }, ['username', 'password']);
 
@@ -23,9 +21,6 @@ export class AuthApiClient extends BaseApiClient {
     return response;
   }
 
-  /**
-   * Register new user
-   */
   async register(username: string, email: string, password: string): Promise<AuthResponse> {
     validateRequired({ username, email, password }, ['username', 'email', 'password']);
 
@@ -43,9 +38,6 @@ export class AuthApiClient extends BaseApiClient {
     return response;
   }
 
-  /**
-   * Logout user
-   */
   logout(): void {
     this.clearToken();
   }

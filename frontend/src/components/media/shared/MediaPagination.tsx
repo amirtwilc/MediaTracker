@@ -1,6 +1,6 @@
 import React from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { PaginationState } from '../../../types/media.types';
+import type { PaginationState } from '../../../types/media.types';
 
 export interface MediaPaginationProps {
   paginationState: PaginationState;

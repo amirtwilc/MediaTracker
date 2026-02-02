@@ -1,5 +1,5 @@
 import React from 'react';
-import { SortConfig } from '../../../types/media.types';
+import type { SortConfig } from '../../../types/media.types';
 
 export interface MediaTableColumn<T = any> {
   key: string;

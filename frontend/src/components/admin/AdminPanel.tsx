@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Upload, X, CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react';
-import { Genre, Platform } from '../../types';
+import type { Genre, Platform } from '../../types';
 import { api, ApiError, NetworkError, TimeoutError, JobStatus } from '../../api';
 import { UpdateMediaItem } from './UpdateMediaItem';
 
