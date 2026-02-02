@@ -33,7 +33,6 @@ spring:
       skip-limit: 100
 
   kafka:
-    bootstrap-servers: localhost:9092
     topics:
       media-rating-topic: media-ratings
       topic-partitions: 3
@@ -43,6 +42,8 @@ spring:
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       acks: all
       retries: 3
+      properties:
+        enable.idempotence: true
     consumer:
       key-deserializer: org.apache.kafka.common.serialization.LongDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
@@ -67,10 +68,19 @@ spring:
 server:
   servlet:
     context-path: /media-tracker
-  port: 8080
+  port: ${PORT:8080}
   error:
     include-message: always
     include-stacktrace: on_param
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
 
 # JWT Configuration
 jwt:

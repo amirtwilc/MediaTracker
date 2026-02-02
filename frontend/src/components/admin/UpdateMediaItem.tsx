@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Search, Trash2, ChevronLeft, ChevronRight, AlertCircle, CheckCircle } from 'lucide-react';
-import { MediaItem, Genre, Platform } from '../../types';
+import type { MediaItem, Genre, Platform } from '../../types';
 import { api, ApiError, NetworkError, TimeoutError } from '../../api';
 import { getCategoryColor } from '../../utils/categoryColors';
 import { ConfirmModal } from '../common/ConfirmModal';

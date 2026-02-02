@@ -1,6 +1,6 @@
 import React from 'react';
 import { Filter, ChevronDown, ChevronUp } from 'lucide-react';
-import { Genre, Platform } from '../../../types';
+import type { Genre, Platform } from '../../../types';
 
 export interface MediaFiltersProps {
   showFilters: boolean;

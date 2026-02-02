@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { User, UserFollow } from '../../types';
+import type { User, UserFollow } from '../../types';
 import { api, ApiError, NetworkError, TimeoutError } from '../../api';
 import { ConfirmModal } from '../common/ConfirmModal';
 import { 

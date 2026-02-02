@@ -15,7 +15,7 @@ import {
   CheckCircle,
   Users as UsersIcon,
 } from 'lucide-react';
-import { UserProfile } from '../../api/api.types';
+import type { UserProfile } from '../../api/api.types';
 import { api, ApiError, NetworkError, TimeoutError } from '../../api';
 import { ThresholdModal } from '../common/ThresholdModal';
 import { formatDate } from '../../utils/DateUtil';
