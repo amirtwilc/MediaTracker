@@ -106,7 +106,7 @@ const Header: React.FC<HeaderProps> = ({
       <div className="container mx-auto px-4 py-4 flex justify-between items-center">
         <div className="flex items-center gap-3">
           <img
-            src="/logo.png"
+            src={`${process.env.PUBLIC_URL}/logo.png`}
             alt="Media Tracker Logo"
             className="h-8 w-8"
           />
