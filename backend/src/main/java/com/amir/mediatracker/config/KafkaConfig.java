@@ -14,7 +14,7 @@ public class KafkaConfig {
     private final KafkaTopicProperties kafkaTopicProperties;
 
     @Bean
-    @Profile("local")
+    @Profile({"local", "docker"})
     public NewTopic ratingTopic() {
         return TopicBuilder.name(kafkaTopicProperties.getMediaRatingTopic())
                 .partitions(kafkaTopicProperties.getTopicPartitions())
