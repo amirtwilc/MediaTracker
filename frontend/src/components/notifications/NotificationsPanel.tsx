@@ -1,24 +1,17 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { X, Bell, BellOff, CheckCircle, AlertCircle, Loader2, RefreshCw } from 'lucide-react';
+import { X, Bell, BellOff, Loader2, RefreshCw } from 'lucide-react';
 import type { Notification } from '../../types';
-import { api, ApiError, NetworkError, TimeoutError } from '../../api';
+import { api } from '../../api';
 import { StarRating } from '../common/StarRating';
+import { useAlert } from '../../hooks/useAlert';
+import { AlertContainer } from '../common/Alert';
 
-// Constants
 const MODAL_Z_INDEX = 'z-50';
 
 interface NotificationsPanelProps {
   onClose: () => void;
 }
 
-interface AlertState {
-  type: 'success' | 'error' | null;
-  message: string;
-}
-
-/**
- * Format timestamp to relative time
- */
 const formatRelativeTime = (dateString: string): string => {
   const date = new Date(dateString);
   const now = new Date();
@@ -41,9 +34,7 @@ const formatRelativeTime = (dateString: string): string => {
   });
 };
 
-/**
- * Loading Skeleton Component
- */
+// Loading Skeleton Component
 const NotificationSkeleton: React.FC = () => (
   <div className="space-y-3">
     {[...Array(3)].map((_, i) => (
@@ -55,9 +46,6 @@ const NotificationSkeleton: React.FC = () => (
   </div>
 );
 
-/**
- * Empty State Component
- */
 const EmptyState: React.FC<{ filtered: boolean }> = ({ filtered }) => (
   <div className="text-center py-12">
     <div className="mb-4">
@@ -78,9 +66,6 @@ const EmptyState: React.FC<{ filtered: boolean }> = ({ filtered }) => (
   </div>
 );
 
-/**
- * Notifications Panel Component
- */
 export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ onClose }) => {
   // Data state
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -91,15 +76,12 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ onClose 
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const [loadingIds, setLoadingIds] = useState<Set<number>>(new Set());
   const [isMarkingAllRead, setIsMarkingAllRead] = useState(false);
-  const [alert, setAlert] = useState<AlertState>({ type: null, message: '' });
+  const { alert, showSuccess, showError, handleApiError } = useAlert();
   
   // Refs
   const panelRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
-  /**
-   * Load notifications
-   */
   const loadNotifications = useCallback(async (showRefreshIndicator = false) => {
     if (showRefreshIndicator) {
       setIsRefreshing(true);
@@ -112,43 +94,21 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ onClose 
       setNotifications(data);
       
       if (showRefreshIndicator) {
-        showAlert('success', 'Notifications refreshed');
+        showSuccess('Notifications refreshed');
       }
     } catch (error) {
-      if (error instanceof ApiError) {
-        showAlert('error', error.message);
-      } else if (error instanceof NetworkError) {
-        showAlert('error', 'Network error. Please check your connection.');
-      } else if (error instanceof TimeoutError) {
-        showAlert('error', 'Request timeout. Please try again.');
-      } else {
-        showAlert('error', 'Failed to load notifications');
-      }
-      console.error('Failed to load notifications', error);
+      handleApiError(error, 'Failed to load notifications');
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
   }, [showUnreadOnly]);
 
-  /**
-   * Initial load
-   */
+  // Initial load
   useEffect(() => {
     loadNotifications();
   }, [loadNotifications]);
 
-  /**
-   * Show alert with auto-dismiss
-   */
-  const showAlert = useCallback((type: 'success' | 'error', message: string) => {
-    setAlert({ type, message });
-    setTimeout(() => setAlert({ type: null, message: '' }), 3000);
-  }, []);
-
-  /**
-   * Handle Escape key
-   */
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -197,9 +157,6 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ onClose 
     return () => document.removeEventListener('keydown', handleTab);
   }, []);
 
-  /**
-   * Handle backdrop click
-   */
   const handleBackdropClick = useCallback(
     (e: React.MouseEvent) => {
       if (e.target === e.currentTarget) {
@@ -209,38 +166,24 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ onClose 
     [onClose]
   );
 
-  /**
-   * Handle mark as read
-   */
   const handleMarkAsRead = useCallback(async (id: number) => {
     // Prevent duplicate requests
     if (loadingIds.has(id)) return;
 
-    // Add to loading set
     setLoadingIds(prev => new Set(prev).add(id));
 
     try {
       await api.notifications.markNotificationAsRead(id);
       
-      // Optimistically update UI
       setNotifications(prev =>
         prev.map(notif =>
           notif.id === id ? { ...notif, isRead: true } : notif
         )
       );
       
-      showAlert('success', 'Marked as read');
+      showSuccess('Marked as read');
     } catch (error) {
-      if (error instanceof ApiError) {
-        showAlert('error', error.message);
-      } else if (error instanceof NetworkError) {
-        showAlert('error', 'Network error. Please check your connection.');
-      } else if (error instanceof TimeoutError) {
-        showAlert('error', 'Request timeout. Please try again.');
-      } else {
-        showAlert('error', 'Failed to mark as read');
-      }
-      console.error('Failed to mark as read', error);
+      handleApiError(error, 'Failed to mark notification as read');
     } finally {
       // Remove from loading set
       setLoadingIds(prev => {
@@ -249,17 +192,14 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ onClose 
         return next;
       });
     }
-  }, [loadingIds, showAlert]);
+  }, [loadingIds]);
 
-  /**
-   * Handle mark all as read
-   */
   const handleMarkAllAsRead = useCallback(async () => {
     if (isMarkingAllRead) return;
 
     const unreadNotifications = notifications.filter(n => !n.isRead);
     if (unreadNotifications.length === 0) {
-      showAlert('error', 'No unread notifications to mark');
+      showError('No unread notifications to mark');
       return;
     }
 
@@ -273,36 +213,21 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ onClose 
         prev.map(notif => ({ ...notif, isRead: true }))
       );
       
-      showAlert('success', 'All notifications marked as read');
+      showSuccess('All notifications marked as read');
     } catch (error) {
-      if (error instanceof ApiError) {
-        showAlert('error', error.message);
-      } else if (error instanceof NetworkError) {
-        showAlert('error', 'Network error. Please check your connection.');
-      } else if (error instanceof TimeoutError) {
-        showAlert('error', 'Request timeout. Please try again.');
-      } else {
-        showAlert('error', 'Failed to mark all as read');
-      }
-      console.error('Failed to mark all as read', error);
+      handleApiError(error, 'Failed to mark all notifications as read');
       
       // Reload on error to ensure consistency
       loadNotifications();
     } finally {
       setIsMarkingAllRead(false);
     }
-  }, [isMarkingAllRead, notifications, showAlert, loadNotifications]);
+  }, [isMarkingAllRead, notifications, loadNotifications]);
 
-  /**
-   * Handle refresh
-   */
   const handleRefresh = useCallback(() => {
     loadNotifications(true);
   }, [loadNotifications]);
 
-  /**
-   * Toggle filter
-   */
   const handleToggleFilter = useCallback(() => {
     setShowUnreadOnly(prev => !prev);
   }, []);
@@ -345,24 +270,7 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ onClose 
           </button>
         </div>
 
-        {/* Alert Messages */}
-        {alert.type && (
-          <div
-            className={`mx-4 mt-4 p-3 rounded-lg flex items-center gap-2 ${
-              alert.type === 'success'
-                ? 'bg-green-900 bg-opacity-20 border border-green-700 text-green-400'
-                : 'bg-red-900 bg-opacity-20 border border-red-700 text-red-400'
-            }`}
-            role="alert"
-          >
-            {alert.type === 'success' ? (
-              <CheckCircle size={16} />
-            ) : (
-              <AlertCircle size={16} />
-            )}
-            <span className="text-sm">{alert.message}</span>
-          </div>
-        )}
+        <AlertContainer alert={alert} />
 
         {/* Controls */}
         <div className="p-4 border-b border-gray-700 flex gap-2 justify-between items-center">

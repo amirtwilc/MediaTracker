@@ -15,6 +15,8 @@ import { useMediaPagination } from '../../hooks/useMediaPagination';
 import { useFilters } from '../../hooks/useFilters';
 import { useDebounce } from '../../hooks/useDebounce';
 import { useSort } from '../../hooks/useSort';
+import { useAlert } from '../../hooks/useAlert';
+import { AlertContainer } from '../common/Alert';
 import type { Cursor, PaginationMode, SortConfig, MediaFilters as MediaFiltersType } from '../../types/media.types';
 
 interface UserProfileProps {
@@ -25,13 +27,12 @@ interface UserProfileProps {
 export const UserProfile: React.FC<UserProfileProps> = ({ userId, onBack }) => {
   const { user: currentUser } = useAuth();
 
-  // Profile state
   const [profile, setProfile] = useState<UserProfileType | null>(null);
   const [error, setError] = useState<string>('');
   const [isFollowing, setIsFollowing] = useState(false);
   const [currentThreshold, setCurrentThreshold] = useState<number | null>(null);
+  const { alert, handleApiError } = useAlert();
 
-  // Filters (only categories for UserProfile)
   const {
     filters,
     setSearchQuery,
@@ -46,7 +47,6 @@ export const UserProfile: React.FC<UserProfileProps> = ({ userId, onBack }) => {
   // Sort management
   const { sortConfig, paginationMode, handleSort } = useSort();
 
-  // Fetch function for pagination hook
   const fetchPage = async ({
     page,
     cursor,
@@ -109,7 +109,6 @@ export const UserProfile: React.FC<UserProfileProps> = ({ userId, onBack }) => {
     }
   };
 
-  // Pagination hook
   const {
     items,
     paginationState,
@@ -138,7 +137,6 @@ export const UserProfile: React.FC<UserProfileProps> = ({ userId, onBack }) => {
 
   const isInitialMount = useRef(true);
 
-  // Load profile
   const loadProfile = async () => {
     try {
       const data = await api.users.getUserProfile(userId);
@@ -191,7 +189,6 @@ export const UserProfile: React.FC<UserProfileProps> = ({ userId, onBack }) => {
     }
   }, [sortConfig]);
 
-  // Follow handlers
   const handleFollowClick = () => {
     setFollowModal({ show: true });
   };
@@ -203,7 +200,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ userId, onBack }) => {
       loadProfile();
       setFollowModal({ show: false });
     } catch (error) {
-      console.error('Failed to follow user', error);
+      handleApiError(error, 'Failed to follow user');
     }
   };
 
@@ -219,7 +216,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ userId, onBack }) => {
       setUnfollowConfirm(false);
       await loadProfile();
     } catch (error) {
-      console.error('Failed to unfollow user', error);
+      handleApiError(error, 'Failed to unfollow user');
       setUnfollowConfirm(false);
     }
   };
@@ -231,7 +228,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ userId, onBack }) => {
       setEditingThreshold(false);
       await loadProfile();
     } catch (error) {
-      console.error('Failed to update threshold', error);
+      handleApiError(error, 'Failed to update threshold');
     }
   };
 
@@ -351,6 +348,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ userId, onBack }) => {
 
   return (
     <div className="space-y-4">
+      <AlertContainer alert={alert} />
       {/* Back Button and Profile Header */}
       <div className="flex items-start justify-between">
         <button
@@ -563,7 +561,6 @@ export const UserProfile: React.FC<UserProfileProps> = ({ userId, onBack }) => {
         </>
       )}
 
-      {/* Modals */}
       <ConfirmModal
         isOpen={unfollowConfirm}
         title="Unfollow User"

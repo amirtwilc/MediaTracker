@@ -13,10 +13,11 @@ import { useMediaPagination } from '../../hooks/useMediaPagination';
 import { useFilters } from '../../hooks/useFilters';
 import { useDebounce } from '../../hooks/useDebounce';
 import { useSort } from '../../hooks/useSort';
+import { useAlert } from '../../hooks/useAlert';
+import { AlertContainer } from '../common/Alert';
 import type { Cursor, PaginationMode, SortConfig, MediaFilters as MediaFiltersType } from '../../types/media.types';
 
 export const MyMediaList: React.FC = () => {
-  // Filters and search
   const {
     filters,
     availableFilters,
@@ -34,10 +35,8 @@ export const MyMediaList: React.FC = () => {
 
   const debouncedSearchQuery = useDebounce(filters.searchQuery, 500);
 
-  // Sort management
   const { sortConfig, paginationMode, handleSort } = useSort();
 
-  // Fetch function for pagination hook
   const fetchPage = async ({
     page,
     cursor,
@@ -113,7 +112,6 @@ export const MyMediaList: React.FC = () => {
     }
   };
 
-  // Pagination hook
   const {
     items,
     paginationState,
@@ -135,6 +133,7 @@ export const MyMediaList: React.FC = () => {
   });
 
   // UI state
+  const { alert, showSuccess, handleApiError } = useAlert();
   const [showFilters, setShowFilters] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editState, setEditState] = useState<Partial<UserMediaListItem>>({});
@@ -145,7 +144,6 @@ export const MyMediaList: React.FC = () => {
 
   const isInitialMount = useRef(true);
 
-  // Load available filters
   const loadAvailableFilters = async () => {
     try {
       const categories = filters.categories.length > 0 ? filters.categories : undefined;
@@ -164,7 +162,7 @@ export const MyMediaList: React.FC = () => {
       setAvailableGenres(genresData);
       setAvailablePlatforms(platformsData);
     } catch (error) {
-      console.error('Failed to load available filters', error);
+      handleApiError(error, 'Failed to load available filters');
     }
   };
 
@@ -192,7 +190,6 @@ export const MyMediaList: React.FC = () => {
     }
   }, [sortConfig]);
 
-  // Edit handlers
   const handleStartEdit = (item: UserMediaListItem) => {
     setEditingId(item.id);
     setEditState({
@@ -218,7 +215,7 @@ export const MyMediaList: React.FC = () => {
       await loadPage(paginationState.currentPage, true);
       await loadAvailableFilters();
     } catch (error) {
-      console.error('Failed to update item', error);
+      handleApiError(error, 'Failed to update item');
     }
   };
 
@@ -234,8 +231,9 @@ export const MyMediaList: React.FC = () => {
         // Reload current page
         await loadPage(paginationState.currentPage, true);
         await loadAvailableFilters();
+        showSuccess('Item removed from your list');
       } catch (error) {
-        console.error('Failed to remove item', error);
+        handleApiError(error, 'Failed to remove item');
       }
     }
     setDeleteConfirm({ show: false, id: null });
@@ -423,14 +421,14 @@ export const MyMediaList: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      {/* Search */}
+      <AlertContainer alert={alert} />
+
       <MediaSearch
         value={filters.searchQuery}
         onChange={setSearchQuery}
         placeholder="Search in your list by name..."
       />
 
-      {/* Filters */}
       <MediaFilters
         showFilters={showFilters}
         onToggleFilters={() => setShowFilters(!showFilters)}
@@ -466,7 +464,6 @@ export const MyMediaList: React.FC = () => {
         </div>
       )}
 
-      {/* Table */}
       <MediaTable
         columns={columns}
         items={items}
@@ -479,14 +476,12 @@ export const MyMediaList: React.FC = () => {
         }
       />
 
-      {/* Pagination */}
       <MediaPagination
         paginationState={paginationState}
         onNextPage={handleNextPage}
         onPrevPage={handlePrevPage}
       />
 
-      {/* Delete Confirmation Modal */}
       <ConfirmModal
         isOpen={deleteConfirm.show}
         title="Remove Item"

@@ -11,6 +11,8 @@ import { useMediaPagination } from '../../hooks/useMediaPagination';
 import { useFilters } from '../../hooks/useFilters';
 import { useDebounce } from '../../hooks/useDebounce';
 import { useSort } from '../../hooks/useSort';
+import { useAlert } from '../../hooks/useAlert';
+import { AlertContainer } from '../common/Alert';
 import type { Cursor, PaginationMode, SortConfig, MediaFilters as MediaFiltersType } from '../../types/media.types';
 
 export const SearchMedia: React.FC = () => {
@@ -34,7 +36,6 @@ export const SearchMedia: React.FC = () => {
   // Sort management
   const { sortConfig, paginationMode, handleSort, setSortConfig } = useSort();
 
-  // Fetch function for pagination hook
   const fetchPage = async ({
     page,
     cursor,
@@ -104,7 +105,6 @@ export const SearchMedia: React.FC = () => {
     }
   };
 
-  // Pagination hook
   const {
     items,
     paginationState,
@@ -125,14 +125,13 @@ export const SearchMedia: React.FC = () => {
   });
 
   // UI state
+  const { alert, showSuccess, handleApiError } = useAlert();
   const [showFilters, setShowFilters] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string>('');
   const [editingAddedId, setEditingAddedId] = useState<number | null>(null);
   const [editState, setEditState] = useState<Partial<UserMediaListItem>>({});
 
   const isInitialMount = useRef(true);
 
-  // Load available filters
   const loadAvailableFilters = async () => {
     try {
       const categories = filters.categories.length > 0 ? filters.categories : undefined;
@@ -151,7 +150,7 @@ export const SearchMedia: React.FC = () => {
       setAvailableGenres(genresData);
       setAvailablePlatforms(platformsData);
     } catch (error) {
-      console.error('Failed to load available filters', error);
+      handleApiError(error, 'Failed to load available filters');
     }
   };
 
@@ -185,15 +184,6 @@ export const SearchMedia: React.FC = () => {
     }
   }, [sortConfig]);
 
-  // Auto-hide error message
-  useEffect(() => {
-    if (errorMessage) {
-      const timer = setTimeout(() => setErrorMessage(''), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [errorMessage]);
-
-  // Add item handler
   const handleAdd = async (mediaItemId: number) => {
     try {
       const result = await api.userMedia.addToMyList(mediaItemId);
@@ -211,27 +201,25 @@ export const SearchMedia: React.FC = () => {
           item.inUserList = true;
         }
       });
-
-      setErrorMessage('');
+      showSuccess('Item added to your list');
     } catch (error: any) {
-      setErrorMessage(error.message || 'Failed to add item');
+      handleApiError(error, 'Failed to add item');
     }
   };
 
-  // Update item handler
-  const handleSaveUpdate = async (mediaItemId: number) => {
+  const handleItemUpdate = async (mediaItemId: number) => {
     try {
       if (editState.id) {
         await api.userMedia.updateMyListItem(editState.id, editState);
         setEditingAddedId(null);
         setEditState({});
       }
+      showSuccess('Item updated successfully');
     } catch (error) {
-      console.error('Failed to update item', error);
+      handleApiError(error, 'Failed to update item');
     }
   };
 
-  // Clear all handler
   const handleClearAll = () => {
     setSearchQuery('');
     clearAllFilters();
@@ -391,7 +379,7 @@ export const SearchMedia: React.FC = () => {
         if (isEditing) {
           return (
             <button
-              onClick={() => handleSaveUpdate(item.id)}
+              onClick={() => handleItemUpdate(item.id)}
               className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs"
             >
               Update
@@ -425,15 +413,7 @@ export const SearchMedia: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      {/* Error Notification */}
-      {errorMessage && (
-        <div className="bg-red-900 border border-red-700 text-red-200 px-4 py-3 rounded flex justify-between items-center">
-          <span>{errorMessage}</span>
-          <button onClick={() => setErrorMessage('')} className="text-red-200 hover:text-white">
-            <X size={18} />
-          </button>
-        </div>
-      )}
+      <AlertContainer alert={alert} />
 
       {/* Search */}
       <div className="flex gap-2">
@@ -456,7 +436,6 @@ export const SearchMedia: React.FC = () => {
         )}
       </div>
 
-      {/* Filters */}
       <MediaFilters
         showFilters={showFilters}
         onToggleFilters={() => setShowFilters(!showFilters)}
