@@ -157,8 +157,6 @@ export const Settings: React.FC = () => {
         </button>
       </div>
 
-      <AlertContainer alert={alert} />
-
       {/* Settings Panel */}
       <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 space-y-6">
         {/* Privacy Settings Section */}
