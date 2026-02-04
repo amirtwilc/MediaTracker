@@ -1,25 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Save, RefreshCw, AlertCircle, CheckCircle, Loader2, Shield } from 'lucide-react';
-import { api, ApiError, NetworkError, TimeoutError } from '../../api';
+import { Save, RefreshCw, AlertCircle, Loader2, Shield } from 'lucide-react';
+import { api } from '../../api';
 import { ConfirmModal } from '../common/ConfirmModal';
+import { useAlert } from '../../hooks/useAlert';
+import { AlertContainer } from '../common/Alert';
 
-// Constants
-const SUCCESS_MESSAGE_DURATION_MS = 3000;
-
-// Types
 interface UserSettings {
   isInvisible: boolean;
   showEmail: boolean;
 }
 
-interface AlertState {
-  type: 'success' | 'error' | null;
-  message: string;
-}
-
-/**
- * Loading Skeleton Component
- */
 const SettingsSkeleton: React.FC = () => (
   <div className="max-w-2xl mx-auto space-y-6">
     <div className="h-8 bg-gray-700 rounded w-48 animate-pulse"></div>
@@ -35,11 +25,7 @@ const SettingsSkeleton: React.FC = () => (
   </div>
 );
 
-/**
- * Settings Component
- */
 export const Settings: React.FC = () => {
-  // Settings state
   const [settings, setSettings] = useState<UserSettings>({
     isInvisible: false,
     showEmail: false,
@@ -52,22 +38,16 @@ export const Settings: React.FC = () => {
   // UI state
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [alert, setAlert] = useState<AlertState>({ type: null, message: '' });
+  const { alert, showSuccess, showError, handleApiError } = useAlert();
   const [showInvisibleConfirm, setShowInvisibleConfirm] = useState(false);
   const [pendingInvisibleValue, setPendingInvisibleValue] = useState(false);
 
-  /**
-   * Check if settings have been modified
-   */
+  // Check if settings have been modified
   const isDirty = settings.isInvisible !== originalSettings.isInvisible ||
                    settings.showEmail !== originalSettings.showEmail;
 
-  /**
-   * Load user settings
-   */
   const loadSettings = useCallback(async () => {
     setIsLoading(true);
-    setAlert({ type: null, message: '' });
 
     try {
       const response = await api.users.getUserSettings();
@@ -80,42 +60,18 @@ export const Settings: React.FC = () => {
       setSettings(loadedSettings);
       setOriginalSettings(loadedSettings);
     } catch (error) {
-      if (error instanceof ApiError) {
-        showAlert('error', error.message);
-      } else if (error instanceof NetworkError) {
-        showAlert('error', 'Network error. Please check your connection.');
-      } else if (error instanceof TimeoutError) {
-        showAlert('error', 'Request timeout. Please try again.');
-      } else {
-        showAlert('error', 'Failed to load settings');
-      }
-      console.error('Failed to load settings', error);
+      handleApiError(error, 'Failed to load settings');
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  /**
-   * Initial load
-   */
+  // Initial load
   useEffect(() => {
     loadSettings();
   }, [loadSettings]);
 
-  /**
-   * Show alert with auto-dismiss
-   */
-  const showAlert = useCallback((type: 'success' | 'error', message: string) => {
-    setAlert({ type, message });
-    
-    if (type === 'success') {
-      setTimeout(() => setAlert({ type: null, message: '' }), SUCCESS_MESSAGE_DURATION_MS);
-    }
-  }, []);
-
-  /**
-   * Warn before leaving with unsaved changes
-   */
+  // Warn before leaving with unsaved changes
   useEffect(() => {
     if (!isDirty) return;
 
@@ -129,17 +85,13 @@ export const Settings: React.FC = () => {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [isDirty]);
 
-  /**
-   * Handle save settings
-   */
   const handleSave = useCallback(async () => {
     if (!isDirty) {
-      showAlert('error', 'No changes to save');
+      showError('No changes to save');
       return;
     }
 
     setIsSaving(true);
-    setAlert({ type: null, message: '' });
 
     try {
       await api.users.updateUserSettings({
@@ -148,34 +100,18 @@ export const Settings: React.FC = () => {
       });
 
       setOriginalSettings(settings);
-      showAlert('success', 'Settings saved successfully!');
+      showSuccess('Settings saved successfully!');
     } catch (error) {
-      if (error instanceof ApiError) {
-        showAlert('error', error.message);
-      } else if (error instanceof NetworkError) {
-        showAlert('error', 'Network error. Please check your connection.');
-      } else if (error instanceof TimeoutError) {
-        showAlert('error', 'Request timeout. Please try again.');
-      } else {
-        showAlert('error', 'Failed to save settings');
-      }
-      console.error('Failed to save settings', error);
+      handleApiError(error, 'Failed to save settings');
     } finally {
       setIsSaving(false);
     }
-  }, [isDirty, settings, showAlert]);
+  }, [isDirty, settings]);
 
-  /**
-   * Handle reset to original values
-   */
   const handleReset = useCallback(() => {
     setSettings(originalSettings);
-    setAlert({ type: null, message: '' });
   }, [originalSettings]);
 
-  /**
-   * Handle invisible profile toggle
-   */
   const handleInvisibleChange = useCallback((checked: boolean) => {
     if (checked && !originalSettings.isInvisible) {
       // Show confirmation when enabling invisible mode
@@ -186,25 +122,16 @@ export const Settings: React.FC = () => {
     }
   }, [originalSettings.isInvisible]);
 
-  /**
-   * Confirm invisible profile change
-   */
   const handleConfirmInvisible = useCallback(() => {
     setSettings(prev => ({ ...prev, isInvisible: pendingInvisibleValue }));
     setShowInvisibleConfirm(false);
   }, [pendingInvisibleValue]);
 
-  /**
-   * Cancel invisible profile change
-   */
   const handleCancelInvisible = useCallback(() => {
     setShowInvisibleConfirm(false);
     setPendingInvisibleValue(false);
   }, []);
 
-  /**
-   * Handle show email toggle
-   */
   const handleShowEmailChange = useCallback((checked: boolean) => {
     setSettings(prev => ({ ...prev, showEmail: checked }));
   }, []);
@@ -216,6 +143,7 @@ export const Settings: React.FC = () => {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
+      <AlertContainer alert={alert} />
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-white">Settings</h2>
@@ -229,24 +157,7 @@ export const Settings: React.FC = () => {
         </button>
       </div>
 
-      {/* Alert Messages */}
-      {alert.type && (
-        <div
-          className={`p-4 rounded-lg flex items-center gap-3 ${
-            alert.type === 'success'
-              ? 'bg-green-900 bg-opacity-20 border border-green-700 text-green-400'
-              : 'bg-red-900 bg-opacity-20 border border-red-700 text-red-400'
-          }`}
-          role="alert"
-        >
-          {alert.type === 'success' ? (
-            <CheckCircle size={20} />
-          ) : (
-            <AlertCircle size={20} />
-          )}
-          <span>{alert.message}</span>
-        </div>
-      )}
+      <AlertContainer alert={alert} />
 
       {/* Settings Panel */}
       <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 space-y-6">

@@ -1,18 +1,16 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Upload, X, CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react';
+import { Upload, X, CheckCircle, XCircle, Clock } from 'lucide-react';
 import type { Genre, Platform } from '../../types';
-import { api, ApiError, NetworkError, TimeoutError, JobStatus } from '../../api';
+import { api, JobStatus } from '../../api';
 import { UpdateMediaItem } from './UpdateMediaItem';
+import { useAlert } from '../../hooks/useAlert';
+import { AlertContainer } from '../common/Alert';
 
-// Constants
 const POLLING_INTERVAL_MS = 1000;
-const SUCCESS_MESSAGE_DURATION_MS = 3000;
-const ERROR_MESSAGE_DURATION_MS = 5000;
 const CURRENT_YEAR = new Date().getFullYear();
 const MIN_YEAR = 1800;
 const MAX_YEAR = CURRENT_YEAR + 10;
 
-// Types
 type TabType = 'create' | 'upload' | 'update';
 type Category = 'MOVIE' | 'SERIES' | 'GAME';
 
@@ -26,11 +24,6 @@ interface UploadProgressState {
   status: string;
 }
 
-interface AlertState {
-  type: 'success' | 'error' | null;
-  message: string;
-}
-
 export const AdminPanel: React.FC = () => {
   // Tab state
   const [activeTab, setActiveTab] = useState<TabType>('create');
@@ -41,7 +34,7 @@ export const AdminPanel: React.FC = () => {
   const [isLoadingData, setIsLoadingData] = useState(true);
   
   // Alert state
-  const [alert, setAlert] = useState<AlertState>({ type: null, message: '' });
+  const { alert, showSuccess, showError, handleApiError } = useAlert();
   
   // Create form state
   const [category, setCategory] = useState<Category>('MOVIE');
@@ -99,9 +92,6 @@ export const AdminPanel: React.FC = () => {
     }
   }, [uploadProgress.show, uploadProgress.status]);
 
-  /**
-   * Load genres and platforms from API
-   */
   const loadGenresAndPlatforms = async () => {
     setIsLoadingData(true);
     try {
@@ -112,25 +102,12 @@ export const AdminPanel: React.FC = () => {
       setGenres(genresData);
       setPlatforms(platformsData);
     } catch (error) {
-      showAlert('error', 'Failed to load genres and platforms');
-      console.error('Failed to load genres/platforms', error);
+      handleApiError(error, 'Failed to load genres and platforms');
     } finally {
       setIsLoadingData(false);
     }
   };
 
-  /**
-   * Show alert message with auto-dismiss
-   */
-  const showAlert = useCallback((type: 'success' | 'error', message: string) => {
-    setAlert({ type, message });
-    const duration = type === 'success' ? SUCCESS_MESSAGE_DURATION_MS : ERROR_MESSAGE_DURATION_MS;
-    setTimeout(() => setAlert({ type: null, message: '' }), duration);
-  }, []);
-
-  /**
-   * Handle form validation
-   */
   const validateCreateForm = (): string | null => {
     if (!name.trim()) {
       return 'Name is required';
@@ -147,16 +124,12 @@ export const AdminPanel: React.FC = () => {
     return null;
   };
 
-  /**
-   * Handle create media item form submission
-   */
   const handleCreateItem = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate form
     const validationError = validateCreateForm();
     if (validationError) {
-      showAlert('error', validationError);
+      showError(validationError);
       return;
     }
     
@@ -171,7 +144,7 @@ export const AdminPanel: React.FC = () => {
         platformIds: selectedPlatforms,
       });
       
-      showAlert('success', 'Media item created successfully!');
+      showSuccess('Media item created successfully!');
       
       // Reset form
       setName('');
@@ -179,24 +152,12 @@ export const AdminPanel: React.FC = () => {
       setSelectedGenres([]);
       setSelectedPlatforms([]);
     } catch (error) {
-      if (error instanceof ApiError) {
-        showAlert('error', error.message);
-      } else if (error instanceof NetworkError) {
-        showAlert('error', 'Network error. Please check your connection.');
-      } else if (error instanceof TimeoutError) {
-        showAlert('error', 'Request timeout. Please try again.');
-      } else {
-        showAlert('error', 'Failed to create media item');
-      }
-      console.error('Create item error:', error);
+      handleApiError(error, 'Failed to create media item');
     } finally {
       setIsCreating(false);
     }
   };
 
-  /**
-   * Clear existing polling interval
-   */
   const clearPolling = useCallback(() => {
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
@@ -205,9 +166,7 @@ export const AdminPanel: React.FC = () => {
     isPollingRef.current = false;
   }, []);
 
-  /**
-   * Poll for job status
-   */
+  // Poll for job status
   const pollStatus = useCallback(async (currentJobId: number) => {
     // Prevent concurrent polling
     if (isPollingRef.current) return;
@@ -217,7 +176,6 @@ export const AdminPanel: React.FC = () => {
       const status = await api.admin.getJobStatus(currentJobId);
       setJobStatus(status);
 
-      // Calculate progress
       const readCount = status.readCount || 0;
       const writeCount = status.writeCount || 0;
       const skipCount = status.skipCount || 0;
@@ -246,19 +204,14 @@ export const AdminPanel: React.FC = () => {
     }
   }, [clearPolling]);
 
-  /**
-   * Handle CSV file upload
-   */
   const handleUploadCSV = async () => {
     if (!file) return;
 
-    // Validate file
     if (!file.name.endsWith('.csv')) {
-      showAlert('error', 'Please select a valid CSV file');
+      showError('Please select a valid CSV file');
       return;
     }
 
-    // Clear any existing polling
     clearPolling();
     setIsUploading(true);
 
@@ -278,7 +231,6 @@ export const AdminPanel: React.FC = () => {
         status: 'STARTING',
       });
 
-      // Start polling for status
       await pollStatus(newJobId);
       pollingIntervalRef.current = setInterval(() => pollStatus(newJobId), POLLING_INTERVAL_MS);
     } catch (error) {
@@ -292,24 +244,12 @@ export const AdminPanel: React.FC = () => {
         status: 'FAILED',
       });
       
-      if (error instanceof ApiError) {
-        showAlert('error', error.message);
-      } else if (error instanceof NetworkError) {
-        showAlert('error', 'Network error. Please check your connection.');
-      } else if (error instanceof TimeoutError) {
-        showAlert('error', 'Request timeout. Please try again.');
-      } else {
-        showAlert('error', 'Failed to upload CSV');
-      }
-      console.error('Upload error:', error);
+      handleApiError(error, 'Upload error:' + error);
     } finally {
       setIsUploading(false);
     }
   };
 
-  /**
-   * Close progress modal
-   */
   const handleCloseProgress = useCallback(() => {
     clearPolling();
     setUploadProgress({
@@ -326,9 +266,6 @@ export const AdminPanel: React.FC = () => {
     setFile(null);
   }, [clearPolling]);
 
-  /**
-   * Toggle genre selection
-   */
   const toggleGenre = (genreId: number) => {
     setSelectedGenres(prev =>
       prev.includes(genreId)
@@ -337,9 +274,6 @@ export const AdminPanel: React.FC = () => {
     );
   };
 
-  /**
-   * Toggle platform selection
-   */
   const togglePlatform = (platformId: number) => {
     setSelectedPlatforms(prev =>
       prev.includes(platformId)
@@ -348,33 +282,13 @@ export const AdminPanel: React.FC = () => {
     );
   };
 
-  /**
-   * Calculate progress percentage
-   */
   const progressPercentage = uploadProgress.total > 0
     ? Math.min((uploadProgress.processed / uploadProgress.total) * 100, 100)
     : 0;
 
   return (
     <div className="space-y-4">
-      {/* Alert Messages */}
-      {alert.type && (
-        <div
-          className={`p-4 rounded-lg flex items-center gap-3 ${
-            alert.type === 'success'
-              ? 'bg-green-900 bg-opacity-20 border border-green-700 text-green-400'
-              : 'bg-red-900 bg-opacity-20 border border-red-700 text-red-400'
-          }`}
-          role="alert"
-        >
-          {alert.type === 'success' ? (
-            <CheckCircle size={20} />
-          ) : (
-            <AlertCircle size={20} />
-          )}
-          <span>{alert.message}</span>
-        </div>
-      )}
+      <AlertContainer alert={alert} />
 
       {/* Tab Navigation */}
       <div className="flex gap-2" role="tablist">

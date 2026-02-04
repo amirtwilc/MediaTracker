@@ -1,19 +1,18 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Search, Trash2, ChevronLeft, ChevronRight, AlertCircle, CheckCircle } from 'lucide-react';
 import type { MediaItem, Genre, Platform } from '../../types';
-import { api, ApiError, NetworkError, TimeoutError } from '../../api';
+import { api } from '../../api';
 import { getCategoryColor } from '../../utils/categoryColors';
 import { ConfirmModal } from '../common/ConfirmModal';
+import { useAlert } from '../../hooks/useAlert';
+import { AlertContainer } from '../common/Alert';
 
-// Constants
 const ITEMS_PER_PAGE = 20;
 const SUCCESS_MESSAGE_DURATION_MS = 3000;
-const SEARCH_DEBOUNCE_MS = 300;
 const CURRENT_YEAR = new Date().getFullYear();
 const MIN_YEAR = 1800;
 const MAX_YEAR = CURRENT_YEAR + 10;
 
-// Types
 interface UpdateMediaItemProps {
   genres?: Genre[];
   platforms?: Platform[];
@@ -26,11 +25,6 @@ interface PaginationState {
   hasNextPage: boolean;
   hasPrevPage: boolean;
   cursors: Array<{ name: string; id: number } | null>;
-}
-
-interface AlertState {
-  type: 'success' | 'error' | null;
-  message: string;
 }
 
 export const UpdateMediaItem: React.FC<UpdateMediaItemProps> = ({
@@ -69,19 +63,8 @@ export const UpdateMediaItem: React.FC<UpdateMediaItemProps> = ({
 
   // UI state
   const [deleteConfirm, setDeleteConfirm] = useState(false);
-  const [alert, setAlert] = useState<AlertState>({ type: null, message: '' });
+  const { alert, showSuccess, showError, handleApiError } = useAlert();
 
-  /**
-   * Show alert with auto-dismiss
-   */
-  const showAlert = useCallback((type: 'success' | 'error', message: string) => {
-    setAlert({ type, message });
-    setTimeout(() => setAlert({ type: null, message: '' }), SUCCESS_MESSAGE_DURATION_MS);
-  }, []);
-
-  /**
-   * Load genres and platforms if not provided via props
-   */
   const loadGenresAndPlatforms = useCallback(async () => {
     // If we already have data from props, don't reload
     if ((propsGenres && propsGenres.length > 0) && (propsPlatforms && propsPlatforms.length > 0)) {
@@ -99,16 +82,13 @@ export const UpdateMediaItem: React.FC<UpdateMediaItemProps> = ({
       setGenres(genresData);
       setPlatforms(platformsData);
     } catch (error) {
-      showAlert('error', 'Failed to load genres and platforms');
-      console.error('Failed to load genres/platforms', error);
+      handleApiError(error, 'Failed to load genres and platforms');
     } finally {
       setIsLoadingReferenceData(false);
     }
-  }, [propsGenres, propsPlatforms, showAlert]);
+  }, [propsGenres, propsPlatforms]);
 
-  /**
-   * Update genres/platforms when props change
-   */
+  //Update genres/platforms when props change
   useEffect(() => {
     if (propsGenres && propsGenres.length > 0) {
       setGenres(propsGenres);
@@ -118,9 +98,6 @@ export const UpdateMediaItem: React.FC<UpdateMediaItemProps> = ({
     }
   }, [propsGenres, propsPlatforms]);
 
-  /**
-   * Load search results page
-   */
   const loadPage = useCallback(async (
     pageNum: number,
     cursor: { name: string; id: number } | null
@@ -158,31 +135,18 @@ export const UpdateMediaItem: React.FC<UpdateMediaItemProps> = ({
         };
       });
     } catch (error) {
-      if (error instanceof ApiError) {
-        showAlert('error', error.message);
-      } else if (error instanceof NetworkError) {
-        showAlert('error', 'Network error. Please check your connection.');
-      } else if (error instanceof TimeoutError) {
-        showAlert('error', 'Request timeout. Please try again.');
-      } else {
-        showAlert('error', 'Search failed');
-      }
-      console.error('Search failed', error);
+      handleApiError(error, 'Search failed');
       setSearchResults([]);
     } finally {
       setIsSearching(false);
     }
-  }, [searchQuery, showAlert]);
+  }, [searchQuery]);
 
-  /**
-   * Handle search with debouncing
-   */
   const handleSearch = useCallback(() => {
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
 
-    // Reset pagination state
     setPagination({
       currentPage: 0,
       totalPages: 0,
@@ -195,57 +159,37 @@ export const UpdateMediaItem: React.FC<UpdateMediaItemProps> = ({
     loadPage(0, null);
   }, [loadPage]);
 
-  /**
-   * Handle debounced search input
-   */
   const handleSearchInputChange = (value: string) => {
     setSearchQuery(value);
     
-    // Clear existing timeout
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
-
-    // Don't auto-search on every keystroke for this use case
-    // User should explicitly click search or press Enter
   };
 
-  /**
-   * Handle next page
-   */
   const handleNextPage = useCallback(() => {
     if (pagination.hasNextPage && pagination.currentPage + 1 < pagination.cursors.length) {
       loadPage(pagination.currentPage + 1, pagination.cursors[pagination.currentPage + 1]);
     }
   }, [pagination, loadPage]);
 
-  /**
-   * Handle previous page
-   */
   const handlePrevPage = useCallback(() => {
     if (pagination.currentPage > 0) {
       loadPage(pagination.currentPage - 1, pagination.cursors[pagination.currentPage - 1]);
     }
   }, [pagination, loadPage]);
 
-  /**
-   * Choose item for editing
-   */
   const handleChooseItem = useCallback(async (item: MediaItem) => {
     setSelectedItem(item);
     setYear(item.year?.toString() || '');
     setSelectedGenres(item.genres.map(g => g.id));
     setSelectedPlatforms(item.platforms.map(p => p.id));
     
-    // Load reference data if not already loaded
     if (genres.length === 0 || platforms.length === 0) {
       await loadGenresAndPlatforms();
     }
   }, [genres.length, platforms.length, loadGenresAndPlatforms]);
 
-  /**
-   * Validate update form
-   */
   const validateUpdateForm = (): string | null => {
     if (selectedGenres.length === 0) {
       return 'Please select at least one genre';
@@ -262,16 +206,13 @@ export const UpdateMediaItem: React.FC<UpdateMediaItemProps> = ({
     return null;
   };
 
-  /**
-   * Handle update item
-   */
   const handleUpdate = async () => {
     if (!selectedItem) return;
 
     // Validate form
     const validationError = validateUpdateForm();
     if (validationError) {
-      showAlert('error', validationError);
+      showError(validationError);
       return;
     }
 
@@ -286,30 +227,18 @@ export const UpdateMediaItem: React.FC<UpdateMediaItemProps> = ({
         platformIds: selectedPlatforms,
       });
 
-      showAlert('success', 'Item updated successfully!');
+      showSuccess('Item updated successfully!');
       setSelectedItem(null);
       
       // Reload current page to show updated data
       loadPage(pagination.currentPage, pagination.cursors[pagination.currentPage]);
     } catch (error) {
-      if (error instanceof ApiError) {
-        showAlert('error', error.message);
-      } else if (error instanceof NetworkError) {
-        showAlert('error', 'Network error. Please check your connection.');
-      } else if (error instanceof TimeoutError) {
-        showAlert('error', 'Request timeout. Please try again.');
-      } else {
-        showAlert('error', 'Failed to update item');
-      }
-      console.error('Update error:', error);
+      handleApiError(error, 'Failed to update item');
     } finally {
       setIsUpdating(false);
     }
   };
 
-  /**
-   * Handle delete item
-   */
   const handleDelete = async () => {
     if (!selectedItem) return;
 
@@ -317,7 +246,7 @@ export const UpdateMediaItem: React.FC<UpdateMediaItemProps> = ({
 
     try {
       await api.admin.deleteMediaItem(selectedItem.id);
-      showAlert('success', 'Item deleted successfully!');
+      showSuccess('Item deleted successfully!');
       setSelectedItem(null);
       setDeleteConfirm(false);
       
@@ -332,25 +261,13 @@ export const UpdateMediaItem: React.FC<UpdateMediaItemProps> = ({
       });
       loadPage(0, null);
     } catch (error) {
-      if (error instanceof ApiError) {
-        showAlert('error', error.message);
-      } else if (error instanceof NetworkError) {
-        showAlert('error', 'Network error. Please check your connection.');
-      } else if (error instanceof TimeoutError) {
-        showAlert('error', 'Request timeout. Please try again.');
-      } else {
-        showAlert('error', 'Failed to delete item');
-      }
-      console.error('Delete error:', error);
+      handleApiError(error, 'Failed to delete item');
       setDeleteConfirm(false);
     } finally {
       setIsDeleting(false);
     }
   };
 
-  /**
-   * Handle cancel editing
-   */
   const handleCancel = useCallback(() => {
     setSelectedItem(null);
     setYear('');
@@ -358,9 +275,6 @@ export const UpdateMediaItem: React.FC<UpdateMediaItemProps> = ({
     setSelectedPlatforms([]);
   }, []);
 
-  /**
-   * Toggle genre selection
-   */
   const toggleGenre = (genreId: number) => {
     setSelectedGenres(prev =>
       prev.includes(genreId)
@@ -369,9 +283,6 @@ export const UpdateMediaItem: React.FC<UpdateMediaItemProps> = ({
     );
   };
 
-  /**
-   * Toggle platform selection
-   */
   const togglePlatform = (platformId: number) => {
     setSelectedPlatforms(prev =>
       prev.includes(platformId)
@@ -395,24 +306,7 @@ export const UpdateMediaItem: React.FC<UpdateMediaItemProps> = ({
   if (selectedItem) {
     return (
       <div className="space-y-4">
-        {/* Alert Messages */}
-        {alert.type && (
-          <div
-            className={`p-4 rounded-lg flex items-center gap-3 ${
-              alert.type === 'success'
-                ? 'bg-green-900 bg-opacity-20 border border-green-700 text-green-400'
-                : 'bg-red-900 bg-opacity-20 border border-red-700 text-red-400'
-            }`}
-            role="alert"
-          >
-            {alert.type === 'success' ? (
-              <CheckCircle size={20} />
-            ) : (
-              <AlertCircle size={20} />
-            )}
-            <span>{alert.message}</span>
-          </div>
-        )}
+        <AlertContainer alert={alert} />
 
         <div className="flex items-center justify-between">
           <h3 className="text-xl font-bold text-white">Update Media Item</h3>
@@ -546,24 +440,7 @@ export const UpdateMediaItem: React.FC<UpdateMediaItemProps> = ({
   // Search view
   return (
     <div className="space-y-4">
-      {/* Alert Messages */}
-      {alert.type && (
-        <div
-          className={`p-4 rounded-lg flex items-center gap-3 ${
-            alert.type === 'success'
-              ? 'bg-green-900 bg-opacity-20 border border-green-700 text-green-400'
-              : 'bg-red-900 bg-opacity-20 border border-red-700 text-red-400'
-          }`}
-          role="alert"
-        >
-          {alert.type === 'success' ? (
-            <CheckCircle size={20} />
-          ) : (
-            <AlertCircle size={20} />
-          )}
-          <span>{alert.message}</span>
-        </div>
-      )}
+      <AlertContainer alert={alert} />
 
       <h3 className="text-xl font-bold text-white">Update Media Item</h3>
 

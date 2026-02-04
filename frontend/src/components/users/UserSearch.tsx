@@ -19,12 +19,12 @@ import type { UserProfile } from '../../api/api.types';
 import { api, ApiError, NetworkError, TimeoutError } from '../../api';
 import { ThresholdModal } from '../common/ThresholdModal';
 import { formatDate } from '../../utils/DateUtil';
+import { useAlert } from '../../hooks/useAlert';
+import { AlertContainer } from '../common/Alert';
 
-// Constants
 const ITEMS_PER_PAGE = 20;
 const SEARCH_DEBOUNCE_MS = 500;
 
-// Types
 interface UserSearchProps {
   onViewUser: (userId: number) => void;
 }
@@ -34,14 +34,6 @@ interface SortConfig {
   direction: 'asc' | 'desc';
 }
 
-interface AlertState {
-  type: 'success' | 'error' | null;
-  message: string;
-}
-
-/**
- * Loading Skeleton
- */
 const UserSearchSkeleton: React.FC = () => (
   <div className="space-y-3">
     {[...Array(5)].map((_, i) => (
@@ -53,9 +45,6 @@ const UserSearchSkeleton: React.FC = () => (
   </div>
 );
 
-/**
- * Empty State
- */
 const EmptyState: React.FC<{ hasSearch: boolean }> = ({ hasSearch }) => (
   <div className="text-center py-12">
     <UsersIcon className="w-16 h-16 text-gray-600 mx-auto mb-4" />
@@ -70,9 +59,6 @@ const EmptyState: React.FC<{ hasSearch: boolean }> = ({ hasSearch }) => (
   </div>
 );
 
-/**
- * User Search Component
- */
 export const UserSearch: React.FC<UserSearchProps> = ({ onViewUser }) => {
   // Data state
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -93,7 +79,7 @@ export const UserSearch: React.FC<UserSearchProps> = ({ onViewUser }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [loadingFollowIds, setLoadingFollowIds] = useState<Set<number>>(new Set());
-  const [alert, setAlert] = useState<AlertState>({ type: null, message: '' });
+  const { alert, showSuccess, showError, handleApiError } = useAlert();
 
   // Follow modal state
   const [followModalUserId, setFollowModalUserId] = useState<number | null>(null);
@@ -104,9 +90,6 @@ export const UserSearch: React.FC<UserSearchProps> = ({ onViewUser }) => {
   const hasSearchedRef = useRef(false);
   const isMountedRef = useRef(false);
 
-  /**
-   * Load users on mount
-   */
   useEffect(() => {
     // Load all users on mount, sorted by last active
     isMountedRef.current = true;
@@ -114,9 +97,6 @@ export const UserSearch: React.FC<UserSearchProps> = ({ onViewUser }) => {
     loadUsers(0);
   }, []); // Only run on mount
 
-  /**
-   * Debounce username input
-   */
   useEffect(() => {
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
@@ -133,9 +113,7 @@ export const UserSearch: React.FC<UserSearchProps> = ({ onViewUser }) => {
     };
   }, [username]);
 
-  /**
-   * Load users when search parameters change (after mount)
-   */
+  // Load users when search parameters change (after mount)
   useEffect(() => {
     // Skip on mount (handled by first useEffect)
     if (!isMountedRef.current) {
@@ -145,17 +123,6 @@ export const UserSearch: React.FC<UserSearchProps> = ({ onViewUser }) => {
     loadUsers(0);
   }, [debouncedUsername, adminOnly, sortConfig]);
 
-  /**
-   * Show alert with auto-dismiss
-   */
-  const showAlert = useCallback((type: 'success' | 'error', message: string) => {
-    setAlert({ type, message });
-    setTimeout(() => setAlert({ type: null, message: '' }), 3000);
-  }, []);
-
-  /**
-   * Load users from API
-   */
   const loadUsers = useCallback(
     async (page: number, showRefreshIndicator = false) => {
       if (showRefreshIndicator) {
@@ -181,19 +148,10 @@ export const UserSearch: React.FC<UserSearchProps> = ({ onViewUser }) => {
         setTotalPages(response.totalPages);
 
         if (showRefreshIndicator) {
-          showAlert('success', 'Users list refreshed');
+          showSuccess('Users list refreshed');
         }
       } catch (error) {
-        if (error instanceof ApiError) {
-          showAlert('error', error.message);
-        } else if (error instanceof NetworkError) {
-          showAlert('error', 'Network error. Please check your connection.');
-        } else if (error instanceof TimeoutError) {
-          showAlert('error', 'Request timeout. Please try again.');
-        } else {
-          showAlert('error', 'Failed to load users');
-        }
-        console.error('Failed to load users', error);
+        handleApiError(error, 'Failed to load users');
         setUsers([]);
         setTotalPages(0);
       } finally {
@@ -201,35 +159,23 @@ export const UserSearch: React.FC<UserSearchProps> = ({ onViewUser }) => {
         setIsRefreshing(false);
       }
     },
-    [debouncedUsername, adminOnly, sortConfig, showAlert]
+    [debouncedUsername, adminOnly, sortConfig]
   );
 
-  /**
-   * Handle manual search button click
-   */
   const handleSearch = useCallback(() => {
     hasSearchedRef.current = true;
     loadUsers(0);
   }, [loadUsers]);
 
-  /**
-   * Handle refresh
-   */
   const handleRefresh = useCallback(() => {
     loadUsers(currentPage, true);
   }, [loadUsers, currentPage]);
 
-  /**
-   * Handle clear search
-   */
   const handleClearSearch = useCallback(() => {
     setUsername('');
     setDebouncedUsername('');
   }, []);
 
-  /**
-   * Handle sort column click
-   */
   const handleSort = useCallback((column: string) => {
     setSortConfig((prev) => {
       if (prev.by === column) {
@@ -240,9 +186,6 @@ export const UserSearch: React.FC<UserSearchProps> = ({ onViewUser }) => {
     });
   }, []);
 
-  /**
-   * Get sort icon for column
-   */
   const getSortIcon = useCallback(
     (column: string) => {
       if (sortConfig.by !== column) return null;
@@ -255,17 +198,11 @@ export const UserSearch: React.FC<UserSearchProps> = ({ onViewUser }) => {
     [sortConfig]
   );
 
-  /**
-   * Handle follow button click
-   */
   const handleFollowClick = useCallback((userId: number, username: string) => {
     setFollowModalUserId(userId);
     setFollowModalUsername(username);
   }, []);
 
-  /**
-   * Handle follow confirmation
-   */
   const handleConfirmFollow = useCallback(
     async (threshold: number | null) => {
       if (followModalUserId === null) return;
@@ -273,7 +210,7 @@ export const UserSearch: React.FC<UserSearchProps> = ({ onViewUser }) => {
       setLoadingFollowIds((prev) => new Set(prev).add(followModalUserId));
 
       try {
-        // Pass threshold directly - null means no notifications
+        // Pass threshold directly
         await api.follows.followUser(followModalUserId, threshold ?? 0);
 
         // Optimistically update UI
@@ -283,20 +220,11 @@ export const UserSearch: React.FC<UserSearchProps> = ({ onViewUser }) => {
           )
         );
 
-        showAlert('success', `Successfully followed ${followModalUsername}`);
+        showSuccess(`Successfully followed ${followModalUsername}`);
         setFollowModalUserId(null);
         setFollowModalUsername('');
       } catch (error) {
-        if (error instanceof ApiError) {
-          showAlert('error', error.message);
-        } else if (error instanceof NetworkError) {
-          showAlert('error', 'Network error. Please check your connection.');
-        } else if (error instanceof TimeoutError) {
-          showAlert('error', 'Request timeout. Please try again.');
-        } else {
-          showAlert('error', 'Failed to follow user');
-        }
-        console.error('Failed to follow user', error);
+        handleApiError(error, 'Failed to follow user');
       } finally {
         setLoadingFollowIds((prev) => {
           const next = new Set(prev);
@@ -305,12 +233,9 @@ export const UserSearch: React.FC<UserSearchProps> = ({ onViewUser }) => {
         });
       }
     },
-    [followModalUserId, followModalUsername, showAlert]
+    [followModalUserId, followModalUsername]
   );
 
-  /**
-   * Handle unfollow
-   */
   const handleUnfollow = useCallback(
     async (userId: number, e: React.MouseEvent) => {
       e.stopPropagation();
@@ -329,18 +254,9 @@ export const UserSearch: React.FC<UserSearchProps> = ({ onViewUser }) => {
           )
         );
 
-        showAlert('success', 'Successfully unfollowed user');
+        showSuccess('Successfully unfollowed user');
       } catch (error) {
-        if (error instanceof ApiError) {
-          showAlert('error', error.message);
-        } else if (error instanceof NetworkError) {
-          showAlert('error', 'Network error. Please check your connection.');
-        } else if (error instanceof TimeoutError) {
-          showAlert('error', 'Request timeout. Please try again.');
-        } else {
-          showAlert('error', 'Failed to unfollow user');
-        }
-        console.error('Failed to unfollow user', error);
+        handleApiError(error, 'Failed to unfollow user');
 
         // Revert optimistic update on error
         setUsers((prev) =>
@@ -356,12 +272,9 @@ export const UserSearch: React.FC<UserSearchProps> = ({ onViewUser }) => {
         });
       }
     },
-    [loadingFollowIds, showAlert]
+    [loadingFollowIds]
   );
 
-  /**
-   * Handle page change
-   */
   const handlePageChange = useCallback(
     (page: number) => {
       loadUsers(page);
@@ -369,9 +282,6 @@ export const UserSearch: React.FC<UserSearchProps> = ({ onViewUser }) => {
     [loadUsers]
   );
 
-  /**
-   * Get sort label
-   */
   const getSortLabel = (by: string): string => {
     const labels: Record<string, string> = {
       registrationDate: 'Registration Date',
@@ -387,20 +297,7 @@ export const UserSearch: React.FC<UserSearchProps> = ({ onViewUser }) => {
 
   return (
     <div className="space-y-4">
-      {/* Alert Messages */}
-      {alert.type && (
-        <div
-          className={`p-4 rounded-lg flex items-center gap-3 ${
-            alert.type === 'success'
-              ? 'bg-green-900 bg-opacity-20 border border-green-700 text-green-400'
-              : 'bg-red-900 bg-opacity-20 border border-red-700 text-red-400'
-          }`}
-          role="alert"
-        >
-          {alert.type === 'success' ? <CheckCircle size={20} /> : <AlertCircle size={20} />}
-          <span>{alert.message}</span>
-        </div>
-      )}
+      <AlertContainer alert={alert} />
 
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -682,7 +579,6 @@ export const UserSearch: React.FC<UserSearchProps> = ({ onViewUser }) => {
         </>
       )}
 
-      {/* Follow Modal */}
       <ThresholdModal
         isOpen={followModalUserId !== null}
         username={followModalUsername}

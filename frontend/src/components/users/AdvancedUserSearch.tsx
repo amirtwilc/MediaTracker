@@ -12,17 +12,17 @@ import {
 } from 'lucide-react';
 import { MediaItem } from '../../types';
 import { UserProfile } from '../../api/api.types';
-import { api, ApiError, NetworkError, TimeoutError } from '../../api';
+import { api } from '../../api';
 import { getCategoryColor } from '../../utils/categoryColors';
+import { useAlert } from '../../hooks/useAlert';
+import { AlertContainer } from '../common/Alert';
 
-// Constants
 const MAX_ITEMS = 5;
 const ITEMS_PER_PAGE = 20;
 const MIN_RATING = 1;
 const MAX_RATING = 10;
 const SEARCH_DEBOUNCE_MS = 500;
 
-// Types
 interface RatingCriteria {
     mediaItem: MediaItem;
     minRating: number;
@@ -33,14 +33,6 @@ interface AdvancedUserSearchProps {
     onViewUser: (userId: number) => void;
 }
 
-interface AlertState {
-    type: 'success' | 'error' | null;
-    message: string;
-}
-
-/**
- * Loading Skeleton
- */
 const LoadingSkeleton: React.FC = () => (
     <div className="space-y-3">
         {[...Array(5)].map((_, i) => (
@@ -52,9 +44,6 @@ const LoadingSkeleton: React.FC = () => (
     </div>
 );
 
-/**
- * Empty State
- */
 const EmptyState: React.FC<{ type: 'media' | 'users' }> = ({ type }) => (
     <div className="text-center py-12">
         {type === 'media' ? (
@@ -73,9 +62,6 @@ const EmptyState: React.FC<{ type: 'media' | 'users' }> = ({ type }) => (
     </div>
 );
 
-/**
- * Rating Range Modal
- */
 const RatingRangeModal: React.FC<{
     isOpen: boolean;
     item: MediaItem | null;
@@ -310,15 +296,12 @@ export const AdvancedUserSearch: React.FC<AdvancedUserSearchProps> = ({ onViewUs
     const [userTotalPages, setUserTotalPages] = useState(0);
 
     // UI state
-    const [alert, setAlert] = useState<AlertState>({ type: null, message: '' });
+    const { alert, showSuccess, showError, handleApiError } = useAlert();
 
     // Refs
     const searchTimeoutRef = useRef<NodeJS.Timeout>(null);
     const resultsRef = useRef<HTMLDivElement>(null);
 
-    /**
-     * Debounce search query
-     */
     useEffect(() => {
         if (searchTimeoutRef.current) {
             clearTimeout(searchTimeoutRef.current);
@@ -335,17 +318,6 @@ export const AdvancedUserSearch: React.FC<AdvancedUserSearchProps> = ({ onViewUs
         };
     }, [searchQuery]);
 
-    /**
-     * Show alert with auto-dismiss
-     */
-    const showAlert = useCallback((type: 'success' | 'error', message: string) => {
-        setAlert({ type, message });
-        setTimeout(() => setAlert({ type: null, message: '' }), 3000);
-    }, []);
-
-    /**
-     * Load media page
-     */
     const loadMediaPage = useCallback(
         async (pageNum: number, cursor: { name: string; id: number } | null) => {
             if (!debouncedQuery.trim()) {
@@ -380,44 +352,26 @@ export const AdvancedUserSearch: React.FC<AdvancedUserSearchProps> = ({ onViewUs
                     });
                 }
             } catch (error) {
-                if (error instanceof ApiError) {
-                    showAlert('error', error.message);
-                } else if (error instanceof NetworkError) {
-                    showAlert('error', 'Network error. Please check your connection.');
-                } else if (error instanceof TimeoutError) {
-                    showAlert('error', 'Request timeout. Please try again.');
-                } else {
-                    showAlert('error', 'Failed to search media');
-                }
-                console.error('Media search failed', error);
+                handleApiError(error, 'Failed to perform search');
                 setMediaResults([]);
             } finally {
                 setIsSearchingMedia(false);
             }
         },
-        [debouncedQuery, showAlert]
+        [debouncedQuery]
     );
 
-    /**
-     * Search media (manual trigger)
-     */
     const handleSearchMedia = useCallback(() => {
         setMediaPage(0);
         setMediaCursors([null]);
         loadMediaPage(0, null);
     }, [loadMediaPage]);
 
-    /**
-     * Handle adding media item
-     */
     const handleAddItem = useCallback((item: MediaItem) => {
         setSelectedMediaItem(item);
         setShowRangeModal(true);
     }, []);
 
-    /**
-     * Confirm rating range
-     */
     const handleConfirmRange = useCallback(
         (min: number, max: number) => {
             if (selectedMediaItem && selectedCriteria.length < MAX_ITEMS) {
@@ -431,22 +385,16 @@ export const AdvancedUserSearch: React.FC<AdvancedUserSearchProps> = ({ onViewUs
                 ]);
                 setShowRangeModal(false);
                 setSelectedMediaItem(null);
-                showAlert('success', `Added ${selectedMediaItem.name} to search criteria`);
+                showSuccess(`Added ${selectedMediaItem.name} to search criteria`);
             }
         },
-        [selectedMediaItem, selectedCriteria.length, showAlert]
+        [selectedMediaItem, selectedCriteria.length]
     );
 
-    /**
-     * Remove criteria
-     */
     const handleRemoveCriteria = useCallback((index: number) => {
         setSelectedCriteria((prev) => prev.filter((_, i) => i !== index));
     }, []);
 
-    /**
-     * Update rating range
-     */
     const handleUpdateRange = useCallback((index: number, min: number, max: number) => {
         setSelectedCriteria((prev) => {
             const updated = [...prev];
@@ -455,13 +403,10 @@ export const AdvancedUserSearch: React.FC<AdvancedUserSearchProps> = ({ onViewUs
         });
     }, []);
 
-    /**
-     * Search users
-     */
     const handleSearchUsers = useCallback(
         async (page: number = 0) => {
             if (selectedCriteria.length === 0) {
-                showAlert('error', 'Please add at least one media item with rating criteria');
+                showError('Please add at least one media item with rating criteria');
                 return;
             }
 
@@ -491,39 +436,18 @@ export const AdvancedUserSearch: React.FC<AdvancedUserSearchProps> = ({ onViewUs
                     resultsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
             } catch (error) {
-                if (error instanceof ApiError) {
-                    showAlert('error', error.message);
-                } else if (error instanceof NetworkError) {
-                    showAlert('error', 'Network error. Please check your connection.');
-                } else if (error instanceof TimeoutError) {
-                    showAlert('error', 'Request timeout. Please try again.');
-                } else {
-                    showAlert('error', 'Failed to search users');
-                }
-                console.error('User search failed', error);
+                handleApiError(error, 'Failed to search users');
                 setUsers([]);
             } finally {
                 setIsSearchingUsers(false);
             }
         },
-        [selectedCriteria, showAlert]
+        [selectedCriteria]
     );
 
     return (
         <div className="space-y-6">
-            {/* Alert Messages */}
-            {alert.type && (
-                <div
-                    className={`p-4 rounded-lg flex items-center gap-3 ${alert.type === 'success'
-                            ? 'bg-green-900 bg-opacity-20 border border-green-700 text-green-400'
-                            : 'bg-red-900 bg-opacity-20 border border-red-700 text-red-400'
-                        }`}
-                    role="alert"
-                >
-                    {alert.type === 'success' ? <CheckCircle size={20} /> : <AlertCircle size={20} />}
-                    <span>{alert.message}</span>
-                </div>
-            )}
+            <AlertContainer alert={alert} />
 
             {/* Selected Criteria */}
             {selectedCriteria.length > 0 && (
@@ -900,7 +824,6 @@ export const AdvancedUserSearch: React.FC<AdvancedUserSearchProps> = ({ onViewUs
                 </div>
             )}
 
-            {/* Rating Range Modal */}
             <RatingRangeModal
                 isOpen={showRangeModal}
                 item={selectedMediaItem}

@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import type { User, UserFollow } from '../../types';
 import { api, ApiError, NetworkError, TimeoutError } from '../../api';
 import { ConfirmModal } from '../common/ConfirmModal';
+import { useAlert } from '../../hooks/useAlert';
+import { AlertContainer } from '../common/Alert';
 import { 
   Users, 
   UserPlus, 
@@ -13,16 +15,9 @@ import {
   BellOff 
 } from 'lucide-react';
 
-// Constants
 const NO_THRESHOLD_VALUE = 0;
 
-// Types
 type TabType = 'following' | 'followers';
-
-interface AlertState {
-  type: 'success' | 'error' | null;
-  message: string;
-}
 
 interface UnfollowConfirmState {
   show: boolean;
@@ -34,9 +29,6 @@ interface FollowManagementProps {
   onViewUser: (userId: number) => void;
 }
 
-/**
- * Empty State Component
- */
 const EmptyState: React.FC<{
   type: 'following' | 'followers';
 }> = ({ type }) => {
@@ -61,9 +53,6 @@ const EmptyState: React.FC<{
   );
 };
 
-/**
- * Follow Management Component
- */
 export const FollowManagement: React.FC<FollowManagementProps> = ({ onViewUser }) => {
   // Data state
   const [following, setFollowing] = useState<UserFollow[]>([]);
@@ -77,18 +66,14 @@ export const FollowManagement: React.FC<FollowManagementProps> = ({ onViewUser }
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isUnfollowing, setIsUnfollowing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [alert, setAlert] = useState<AlertState>({ type: null, message: '' });
+  const { alert, showSuccess, showError, handleApiError } = useAlert();
   
-  // Unfollow confirmation state
   const [unfollowConfirm, setUnfollowConfirm] = useState<UnfollowConfirmState>({
     show: false,
     userId: null,
     username: '',
   });
 
-  /**
-   * Load follow data
-   */
   const loadData = useCallback(async (showRefreshIndicator = false) => {
     if (showRefreshIndicator) {
       setIsRefreshing(true);
@@ -108,35 +93,21 @@ export const FollowManagement: React.FC<FollowManagementProps> = ({ onViewUser }
       setFilteredFollowers(followersData);
       
       if (showRefreshIndicator) {
-        showAlert('success', 'Follow list refreshed successfully');
+        showSuccess('Follow list refreshed successfully');
       }
     } catch (error) {
-      if (error instanceof ApiError) {
-        showAlert('error', error.message);
-      } else if (error instanceof NetworkError) {
-        showAlert('error', 'Network error. Please check your connection.');
-      } else if (error instanceof TimeoutError) {
-        showAlert('error', 'Request timeout. Please try again.');
-      } else {
-        showAlert('error', 'Failed to load follow data');
-      }
-      console.error('Failed to load follow data', error);
+      handleApiError(error, 'Failed to load follow data');
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
   }, []);
 
-  /**
-   * Initial data load
-   */
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  /**
-   * Filter data when search query changes
-   */
+  // Filter data when search query changes
   useEffect(() => {
     if (!searchQuery.trim()) {
       setFilteredFollowing(following);
@@ -161,25 +132,11 @@ export const FollowManagement: React.FC<FollowManagementProps> = ({ onViewUser }
     );
   }, [searchQuery, following, followers]);
 
-  /**
-   * Show alert message with auto-dismiss
-   */
-  const showAlert = useCallback((type: 'success' | 'error', message: string) => {
-    setAlert({ type, message });
-    setTimeout(() => setAlert({ type: null, message: '' }), 5000);
-  }, []);
-
-  /**
-   * Handle refresh button click
-   */
   const handleRefresh = useCallback(() => {
     setSearchQuery(''); // Clear search on refresh
     loadData(true);
   }, [loadData]);
 
-  /**
-   * Handle unfollow user
-   */
   const handleUnfollow = useCallback(async () => {
     if (!unfollowConfirm.userId) return;
 
@@ -192,51 +149,30 @@ export const FollowManagement: React.FC<FollowManagementProps> = ({ onViewUser }
       setFollowing(prev => prev.filter(f => f.user.id !== unfollowConfirm.userId));
       setFilteredFollowing(prev => prev.filter(f => f.user.id !== unfollowConfirm.userId));
       
-      showAlert('success', `Successfully unfollowed ${unfollowConfirm.username}`);
+      showSuccess(`Successfully unfollowed ${unfollowConfirm.username}`);
       setUnfollowConfirm({ show: false, userId: null, username: '' });
     } catch (error) {
-      if (error instanceof ApiError) {
-        showAlert('error', error.message);
-      } else if (error instanceof NetworkError) {
-        showAlert('error', 'Network error. Please check your connection.');
-      } else if (error instanceof TimeoutError) {
-        showAlert('error', 'Request timeout. Please try again.');
-      } else {
-        showAlert('error', 'Failed to unfollow user');
-      }
-      console.error('Failed to unfollow', error);
+      handleApiError(error, 'Failed to unfollow user');
     } finally {
       setIsUnfollowing(false);
     }
-  }, [unfollowConfirm, showAlert]);
+  }, [unfollowConfirm]);
 
-  /**
-   * Show unfollow confirmation
-   */
   const handleUnfollowClick = useCallback((userId: number, username: string) => {
     setUnfollowConfirm({ show: true, userId, username });
   }, []);
 
-  /**
-   * Cancel unfollow
-   */
   const handleCancelUnfollow = useCallback(() => {
     if (!isUnfollowing) {
       setUnfollowConfirm({ show: false, userId: null, username: '' });
     }
   }, [isUnfollowing]);
 
-  /**
-   * Handle tab change
-   */
   const handleTabChange = useCallback((tab: TabType) => {
     setActiveTab(tab);
     setSearchQuery(''); // Clear search when switching tabs
   }, []);
 
-  /**
-   * Format threshold display text
-   */
   const formatThreshold = (threshold: number | null): string => {
     if (threshold === NO_THRESHOLD_VALUE || threshold === null) {
       return 'No notifications';
@@ -259,24 +195,7 @@ export const FollowManagement: React.FC<FollowManagementProps> = ({ onViewUser }
 
   return (
     <div className="space-y-4">
-      {/* Alert Messages */}
-      {alert.type && (
-        <div
-          className={`p-4 rounded-lg flex items-center gap-3 ${
-            alert.type === 'success'
-              ? 'bg-green-900 bg-opacity-20 border border-green-700 text-green-400'
-              : 'bg-red-900 bg-opacity-20 border border-red-700 text-red-400'
-          }`}
-          role="alert"
-        >
-          {alert.type === 'success' ? (
-            <CheckCircle size={20} />
-          ) : (
-            <AlertCircle size={20} />
-          )}
-          <span>{alert.message}</span>
-        </div>
-      )}
+      <AlertContainer alert={alert} />
 
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -424,7 +343,6 @@ export const FollowManagement: React.FC<FollowManagementProps> = ({ onViewUser }
         </div>
       )}
 
-      {/* Unfollow Confirmation Modal */}
       <ConfirmModal
         isOpen={unfollowConfirm.show}
         title="Unfollow User"
