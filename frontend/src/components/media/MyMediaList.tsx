@@ -338,12 +338,16 @@ export const MyMediaList: React.FC = () => {
         const currentExperienced = isEditing ? editState.experienced : item.experienced;
 
         return isEditing && currentExperienced ? (
-          <StarRating
-            rating={editState.rating}
-            onChange={(rating) => setEditState({ ...editState, rating })}
-          />
+          <div className="flex items-center w-[220px]">
+            <StarRating
+              rating={editState.rating}
+              onChange={(rating) => setEditState({ ...editState, rating })}
+            />
+          </div>
         ) : (
-          <StarRating rating={item.rating} readonly />
+          <div className="flex items-center w-[220px]">
+            <StarRating rating={item.rating} readonly />
+          </div>
         );
       },
     },
