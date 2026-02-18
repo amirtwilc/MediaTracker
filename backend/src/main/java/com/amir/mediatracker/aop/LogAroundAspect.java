@@ -22,10 +22,9 @@ import java.util.Arrays;
 public class LogAroundAspect {
 
     @Around(
-            "@within(com.amir.mediatracker.aop.LogAround) || " +
-                    "@annotation(com.amir.mediatracker.aop.LogAround)"
+            "@within(com.amir.mediatracker.aop.LogAround) || " + // for classes
+                    "@annotation(com.amir.mediatracker.aop.LogAround)" // for methods
     )
-    //@Around("@annotation(com.amir.mediatracker.aop.LogAround)")
     public Object logExecution(ProceedingJoinPoint pjp) throws Throwable {
         String className = pjp.getTarget().getClass().getSimpleName();
         String methodName = pjp.getSignature().getName();
@@ -44,7 +43,7 @@ public class LogAroundAspect {
 
 
             if (result == null) {
-                log.info("{}::{}({} ms) returned no response (null)", className, duration, methodName);
+                log.info("{}::{}({} ms) returned no response (null)", className, methodName, duration);
             } else {
                 log.info("{}::{}({} ms) returned: {}", className, methodName, duration, result);
             }
