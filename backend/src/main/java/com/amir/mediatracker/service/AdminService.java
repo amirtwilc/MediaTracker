@@ -38,13 +38,9 @@ import java.util.stream.Collectors;
 public class AdminService {
 
     private final MediaItemRepository mediaItemRepository;
-
     private final GenreRepository genreRepository;
-
     private final PlatformRepository platformRepository;
-
     private final JobExplorer jobExplorer;
-    
     private final AsyncBatchService asyncBatchService;
 
     public List<GenreResponse> getAllGenres() {

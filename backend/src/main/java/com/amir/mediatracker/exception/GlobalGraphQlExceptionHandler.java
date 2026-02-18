@@ -6,7 +6,6 @@ import org.springframework.graphql.data.method.annotation.GraphQlExceptionHandle
 import org.springframework.graphql.execution.ErrorType;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -45,7 +44,7 @@ public class GlobalGraphQlExceptionHandler {
     @GraphQlExceptionHandler(MethodArgumentNotValidException.class)
     public GraphQLError handleValidationErrors(MethodArgumentNotValidException ex) {
         log.error("Validation failed: {}", ex.getMessage());
-        List errors = ex.getBindingResult()
+        List<String> errors = ex.getBindingResult()
                 .getFieldErrors()
                 .stream()
                 .map(error -> error.getField() + ": " + error.getDefaultMessage())

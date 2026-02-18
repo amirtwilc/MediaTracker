@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(ConflictException.class)
-    public ResponseEntity<ErrorResponse> handleResourceNotFound(ConflictException ex) {
+    public ResponseEntity<ErrorResponse> handleConflict(ConflictException ex) {
         log.error("Conflict occurred: {}", ex.getMessage());
         ErrorResponse error = new ErrorResponse(
                 HttpStatus.CONFLICT.value(),
@@ -77,7 +77,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidationErrors(MethodArgumentNotValidException ex) {
         log.error("Validation failed: {}", ex.getMessage());
-        List errors = ex.getBindingResult()
+        List<String> errors = ex.getBindingResult()
                 .getFieldErrors()
                 .stream()
                 .map(error -> error.getField() + ": " + error.getDefaultMessage())
@@ -124,7 +124,7 @@ public class GlobalExceptionHandler {
         log.error("Generic exception: {}", ex.getMessage());
         ErrorResponse error = new ErrorResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                "An unexpected error occurred: " + ex.getMessage(),
+                "An unexpected error occurred",
                 LocalDateTime.now()
         );
         return new ResponseEntity<>(error, HttpStatus.INTERNAL_SERVER_ERROR);
